@@ -4,62 +4,74 @@
 [![npm](https://img.shields.io/npm/v/browsecraft)](https://www.npmjs.com/package/browsecraft)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Browser automation that just works.
+AI-native browser automation framework. Write tests that read like plain English.
 
-```js
-import { Browser } from 'browsecraft';
+```ts
+import { test, expect } from 'browsecraft';
 
-const browser = await Browser.launch();
-const page = await browser.newPage();
+test('user can log in', async ({ page }) => {
+  await page.go('https://www.saucedemo.com');
+  await page.fill('Username', 'standard_user');
+  await page.fill('Password', 'secret_sauce');
+  await page.click('Login');
 
-await page.goto('https://www.saucedemo.com');
-await page.fill('Username', 'standard_user');
-await page.fill('Password', 'secret_sauce');
-await page.click('Login');
-
-await page.waitForURL('inventory');
-console.log(await page.title()); // "Swag Labs"
-
-await browser.close();
+  await page.see('Products');
+  await expect(page).toHaveURL(/inventory/);
+});
 ```
 
-No CSS selectors. No XPath. Just tell it what you see on the page.
+No CSS selectors. No XPath. Every line reads as `subject.verb(target)` — like giving instructions to a person.
 
-## Install
+## Getting Started
 
 ```bash
-npm install browsecraft
+npm init browsecraft
+```
+
+That's it. One command scaffolds everything you need:
+
+- `browsecraft.config.ts` — configuration
+- `tsconfig.json` — TypeScript setup
+- `tests/example.test.ts` — example test you can run immediately
+- Installs all dependencies
+
+**With BDD support** (Gherkin feature files + step definitions):
+
+```bash
+npm init browsecraft -- --bdd
+```
+
+This additionally creates:
+
+- `features/example.feature` — example Gherkin feature file
+- `steps/steps.ts` — step definitions with 38 built-in steps pre-registered
+
+**Other options:**
+
+```bash
+npm init browsecraft my-tests          # Scaffold into a directory
+npm init browsecraft -- --js           # JavaScript instead of TypeScript
+npm init browsecraft -- --quiet --bdd  # Non-interactive (CI mode)
+```
+
+Works with any package manager:
+
+```bash
+pnpm create browsecraft
+yarn create browsecraft
 ```
 
 Requires Node.js 20+ and Chrome, Edge, or Firefox installed on your machine.
 
-## Quick Start
-
-Create a file called `test.mjs`:
-
-```js
-import { Browser } from 'browsecraft';
-
-const browser = await Browser.launch();
-const page = await browser.newPage();
-
-await page.goto('https://example.com');
-console.log(await page.title()); // "Example Domain"
-
-const screenshot = await page.screenshot();
-const { writeFileSync } = await import('node:fs');
-writeFileSync('screenshot.png', screenshot);
-
-await browser.close();
-```
-
-Run it:
+## Run Your Tests
 
 ```bash
-node test.mjs
+npx browsecraft test                   # Run all tests
+npx browsecraft test --headed          # Watch the browser
+npx browsecraft test --browser firefox # Use Firefox
+npx browsecraft test --grep "login"    # Filter by name
+npx browsecraft test --bdd             # Run BDD feature files
 ```
-
-That's it. No config files, no test runner setup, no boilerplate.
 
 ## API
 
@@ -82,7 +94,8 @@ await browser.close();
 ### Navigate
 
 ```js
-await page.goto('https://example.com');
+await page.go('https://example.com');        // English alias (preferred)
+await page.goto('https://example.com');      // Also works
 
 const url = await page.url();
 const title = await page.title();
@@ -109,6 +122,15 @@ await page.fill('Password', 'secret_sauce');
 
 // By CSS selector
 await page.fill({ selector: '#email' }, 'user@example.com');
+```
+
+### Assert visibility
+
+```js
+// Verify an element is visible on the page (auto-waits)
+await page.see('Products');
+await page.see('Welcome back!');
+await page.see({ role: 'heading', name: 'Dashboard' });
 ```
 
 ### Wait for things
@@ -173,9 +195,94 @@ await page2.close();
 await browser.close();
 ```
 
+### Network interception
+
+Intercept requests, mock API responses, wait for network activity, or block unwanted requests.
+
+```js
+// Intercept and mock an API response
+await page.intercept('POST /api/login', async (request) => {
+  return { status: 200, body: { token: 'abc' } };
+});
+
+// Mock a response (simpler shorthand)
+await page.mock('GET /api/users', {
+  status: 200,
+  body: [{ name: 'Alice' }],
+});
+
+// Wait for a response
+const response = await page.waitForResponse('/api/users');
+console.log(response.status); // 200
+
+// Block requests (ads, analytics, etc.)
+await page.blockRequests(['*.google-analytics.com*', '*.doubleclick.net*']);
+```
+
+## Actionability
+
+Browsecraft auto-waits for elements to be actionable before performing actions. Every `click()`, `fill()`, and `see()` call automatically checks that the target element is:
+
+- **Visible** — not `display:none`, `visibility:hidden`, or `opacity:0`
+- **Enabled** — not disabled
+- **Stable** — has non-zero size and is attached to the DOM
+- **Unobscured** — not covered by another element (modals, overlays)
+
+If an element isn't ready, Browsecraft retries until the configured timeout (default: 30s). When it fails, you get a rich error message explaining exactly what went wrong:
+
+```
+ElementNotActionableError: Could not click 'Submit'
+— the element was found but is disabled.
+
+Element state:
+  Tag: <button>
+  Text: "Submit"
+  Visible: true
+  Enabled: false
+
+Hint: Wait for the element to become enabled, or check if a
+      prerequisite action is needed first.
+(waited 30000ms)
+```
+
+## Error Types
+
+Every error tells you **what failed**, **why**, and **how to fix it**:
+
+| Error | When |
+|-------|------|
+| `ElementNotFoundError` | No matching element in the DOM |
+| `ElementNotActionableError` | Element found but not visible, disabled, or obscured |
+| `NetworkError` | Network interception/mock failure |
+| `TimeoutError` | Operation exceeded timeout |
+
+All errors extend `BrowsecraftError` and include `action`, `target`, `elementState`, `hint`, and `elapsed` properties for programmatic handling.
+
 ## BDD Testing
 
 Browsecraft has a built-in BDD framework. No Cucumber, no third-party dependencies — everything is custom-built.
+
+### 38 built-in steps
+
+Register pre-built steps to start writing `.feature` files immediately with zero step definitions:
+
+```js
+import { registerBuiltInSteps } from 'browsecraft-bdd';
+
+registerBuiltInSteps(); // Registers all 38 steps into the global registry
+```
+
+Built-in steps cover navigation, clicking, filling forms, visibility assertions, URL checks, waiting, and more. Examples:
+
+```gherkin
+Given I go to "https://example.com"
+When I click "Submit"
+When I fill "Username" with "admin"
+Then I should see "Welcome"
+Then the URL should contain "dashboard"
+```
+
+You can mix built-in steps with your own custom step definitions.
 
 There are two ways to write BDD tests:
 
@@ -375,15 +482,16 @@ node test.mjs --maximized  # full screen
 
 ## Architecture
 
-Five npm packages, one monorepo:
+Six npm packages, one monorepo:
 
 | Package | Role |
 | --- | --- |
 | `browsecraft` | Main package. Page API, Browser, config, CLI. |
-| `browsecraft-bdd` | Gherkin parser, step registry, executor, hooks, tags, TS-native BDD. |
+| `browsecraft-bdd` | Gherkin parser, step registry, executor, hooks, tags, TS-native BDD, 38 built-in steps. |
 | `browsecraft-bidi` | WebDriver BiDi protocol client and browser launcher. |
 | `browsecraft-runner` | Test file discovery, execution, reporter types. |
 | `browsecraft-ai` | Self-healing selectors, test generation, visual diff. |
+| `create-browsecraft` | Project scaffolding CLI (`npm init browsecraft`). Zero dependencies. |
 
 Most users only need `browsecraft`. Add `browsecraft-bdd` for BDD, `browsecraft-ai` for AI features.
 

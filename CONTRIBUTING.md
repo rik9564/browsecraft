@@ -42,8 +42,9 @@ packages/
   browsecraft/          # Main facade package (Browser, Page, expect, etc.)
   browsecraft-bidi/     # WebDriver BiDi protocol client (leaf package)
   browsecraft-ai/       # AI-powered features (GitHub Models API)
-  browsecraft-bdd/      # Built-in BDD/Gherkin support
+  browsecraft-bdd/      # Built-in BDD/Gherkin support (38 built-in steps)
   browsecraft-runner/   # Test runner
+  create-browsecraft/   # Project scaffolding CLI (npm init browsecraft)
 examples/               # Example projects
 tests/                  # Integration tests (smoke, BDD)
 ```
@@ -56,6 +57,8 @@ browsecraft-bidi (leaf)
   │   └── browsecraft-bdd
   ├── browsecraft-runner
   └── browsecraft (facade)
+
+create-browsecraft (standalone — no workspace deps)
 ```
 
 ## Development Workflow
@@ -110,7 +113,7 @@ Each package uses [tsup](https://tsup.egoist.dev/) (esbuild-powered) for bundlin
 ### Testing
 
 ```bash
-node tests/smoke.mjs           # 41 smoke tests (requires Chrome)
+node tests/smoke.mjs           # 102 smoke tests (requires Chrome)
 node tests/bdd-saucelabs.mjs   # BDD tests against saucedemo.com
 ```
 
