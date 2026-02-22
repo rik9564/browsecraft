@@ -248,8 +248,12 @@ async function loadConfig(): Promise<UserConfig | undefined> {
 		const configPath = resolve(cwd, name);
 		if (existsSync(configPath)) {
 			try {
-				// For .ts files, we need tsx or ts-node to be available
-				const mod = await import(configPath);
+				// For .ts files, ensure a TypeScript loader is registered
+				if (name.endsWith('.ts') || name.endsWith('.mts')) {
+					await ensureTypeScriptLoader();
+				}
+				const fileUrl = pathToFileURL(configPath).href;
+				const mod = await import(fileUrl);
 				return mod.default ?? mod;
 			} catch {
 				// Config file exists but couldn't be loaded -- continue with defaults
@@ -270,6 +274,9 @@ let tsLoaderRegistered = false;
 /**
  * Ensure a TypeScript loader is registered so that .ts test files can be imported.
  * Tries tsx first (fastest), then ts-node, then falls back to a helpful error.
+ *
+ * Resolution note: tsx is installed in the USER's project, not in browsecraft itself.
+ * We must resolve it from the user's cwd using createRequire, not from our package.
  */
 async function ensureTypeScriptLoader(): Promise<void> {
 	if (tsLoaderRegistered) return;
@@ -287,13 +294,33 @@ async function ensureTypeScriptLoader(): Promise<void> {
 		return;
 	}
 
-	// Try to dynamically register tsx or ts-node
+	// Create a require function rooted at the user's cwd so we can find tsx/ts-node
+	// installed in the user's project (not in our package)
+	const { createRequire } = await import('node:module');
+	const userRequire = createRequire(pathToFileURL(resolve(process.cwd(), 'package.json')));
+
+	// Strategy 1: tsx 4.x — use the tsx/esm/api register() function
+	// This is the modern approach that works with tsx 4.x+
+	try {
+		const tsxApiPath = userRequire.resolve('tsx/esm/api');
+		const { register } = await import(pathToFileURL(tsxApiPath).href);
+		if (typeof register === 'function') {
+			register();
+			tsLoaderRegistered = true;
+			return;
+		}
+	} catch {
+		// tsx/esm/api not available, try next strategy
+	}
+
+	// Strategy 2: Older tsx/ts-node — use Node.js module.register()
+	// Works with tsx <4.x and ts-node
 	for (const loader of ['tsx/esm', 'ts-node/esm']) {
 		try {
-			// Node 20.6+ supports module.register()
 			const { register } = await import('node:module');
 			if (typeof register === 'function') {
-				register(loader, pathToFileURL('./'));
+				// Resolve from user's project root so the loader is found
+				register(loader, pathToFileURL(resolve(process.cwd(), '/')));
 				tsLoaderRegistered = true;
 				return;
 			}
