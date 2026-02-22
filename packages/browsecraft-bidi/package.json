@@ -36,7 +36,7 @@
 		"rimraf": "^6.0.1",
 		"tsup": "^8.3.5",
 		"typescript": "^5.7.2",
-		"vitest": "^2.1.0"
+		"vitest": "^4.0.18"
 	},
 	"license": "MIT",
 	"author": "Browsecraft Contributors",
