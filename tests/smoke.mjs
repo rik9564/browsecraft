@@ -6,9 +6,22 @@
 // Run: node tests/smoke.mjs
 // ============================================================================
 
+import {
+	StepRegistry,
+	getBuiltInStepPatterns,
+	globalRegistry,
+	registerBuiltInSteps,
+} from '../packages/browsecraft-bdd/dist/index.js';
 // We import from the compiled dist output to test what users will actually get
 import { BiDiSession } from '../packages/browsecraft-bidi/dist/index.js';
-import { Browser } from '../packages/browsecraft/dist/index.js';
+import {
+	BrowsecraftError,
+	Browser,
+	ElementNotActionableError,
+	ElementNotFoundError,
+	NetworkError,
+	TimeoutError,
+} from '../packages/browsecraft/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';
@@ -300,6 +313,286 @@ async function testEvaluate() {
 }
 
 // ============================================================================
+// Test 5: page.go() and page.see() English aliases
+// ============================================================================
+
+async function testEnglishAliases() {
+	console.log(`\n${BOLD}Test 5: English API aliases (page.go, page.see)${RESET}`);
+
+	let browser;
+	try {
+		browser = await Browser.launch({ headless: true });
+		const page = await browser.newPage();
+
+		// page.go() should work like page.goto()
+		await page.go('https://example.com');
+		const url = await page.url();
+		assert(url.includes('example.com'), 'page.go() navigated correctly');
+
+		// page.see() should find and verify a visible element
+		const handle = await page.see('Example Domain');
+		assert(!!handle, 'page.see() returned an ElementHandle');
+		assert(typeof handle.click === 'function', 'page.see() result has click method');
+		assert(typeof handle.textContent === 'function', 'page.see() result has textContent method');
+
+		// page.see() should find partial text
+		const moreLink = await page.see('Learn more');
+		assert(!!moreLink, 'page.see() found "Learn more" link');
+
+		// page.see() should throw for non-existent text
+		let seeThrew = false;
+		try {
+			await page.see('This text does not exist on the page XYZ123', { timeout: 2000 });
+		} catch {
+			seeThrew = true;
+		}
+		assert(seeThrew, 'page.see() throws when element is not found');
+
+		await page.close();
+	} catch (err) {
+		console.log(`  ${FAIL} English aliases test threw: ${err.message}`);
+		if (err.stack) console.log(`    ${err.stack.split('\n').slice(1, 3).join('\n    ')}`);
+		failed++;
+	} finally {
+		if (browser) {
+			await browser.close().catch(() => {});
+		}
+	}
+}
+
+// ============================================================================
+// Test 6: Rich error classes
+// ============================================================================
+
+async function testErrorClasses() {
+	console.log(`\n${BOLD}Test 6: Rich error classes${RESET}`);
+
+	try {
+		// BrowsecraftError
+		const baseErr = new BrowsecraftError({
+			action: 'click',
+			target: 'Submit',
+			message: 'element not found',
+			hint: 'Check the selector',
+			elapsed: 5000,
+		});
+		assert(baseErr instanceof Error, 'BrowsecraftError extends Error');
+		assert(
+			baseErr.name === 'BrowsecraftError',
+			`name is "BrowsecraftError" (got "${baseErr.name}")`,
+		);
+		assert(baseErr.action === 'click', 'action property set');
+		assert(baseErr.target === 'Submit', 'target property set');
+		assert(baseErr.hint === 'Check the selector', 'hint property set');
+		assert(baseErr.elapsed === 5000, 'elapsed property set');
+		assert(
+			baseErr.message.includes("Could not click 'Submit'"),
+			'message includes readable prefix',
+		);
+		assert(baseErr.message.includes('Hint:'), 'message includes hint');
+
+		// ElementNotFoundError
+		const notFoundErr = new ElementNotFoundError({
+			action: 'fill',
+			target: 'Email',
+			elapsed: 3000,
+			suggestions: ['Email Address', 'Email Input'],
+		});
+		assert(
+			notFoundErr instanceof BrowsecraftError,
+			'ElementNotFoundError extends BrowsecraftError',
+		);
+		assert(notFoundErr.name === 'ElementNotFoundError', `name is "ElementNotFoundError"`);
+		assert(notFoundErr.message.includes('Email Address'), 'includes suggestions in message');
+		assert(notFoundErr.message.includes('Email Input'), 'includes all suggestions');
+		assert(notFoundErr.elementState?.found === false, 'elementState.found is false');
+
+		// ElementNotActionableError
+		const notActionableErr = new ElementNotActionableError({
+			action: 'click',
+			target: 'Submit',
+			reason: 'disabled',
+			elementState: { found: true, visible: true, enabled: false, tagName: 'BUTTON' },
+			elapsed: 2000,
+		});
+		assert(
+			notActionableErr instanceof BrowsecraftError,
+			'ElementNotActionableError extends BrowsecraftError',
+		);
+		assert(notActionableErr.name === 'ElementNotActionableError', 'name is correct');
+		assert(notActionableErr.reason === 'disabled', 'reason property set');
+		assert(notActionableErr.message.includes('disabled'), 'message explains the reason');
+		assert(notActionableErr.elementState?.tagName === 'BUTTON', 'element state has tagName');
+
+		// NetworkError
+		const netErr = new NetworkError({
+			action: 'intercept',
+			target: '/api/users',
+			message: 'request timed out',
+		});
+		assert(netErr instanceof BrowsecraftError, 'NetworkError extends BrowsecraftError');
+		assert(netErr.name === 'NetworkError', 'name is correct');
+
+		// TimeoutError
+		const timeoutErr = new TimeoutError({
+			action: 'waitForSelector',
+			target: '.loading',
+			message: 'timed out waiting for element',
+			elapsed: 30000,
+		});
+		assert(timeoutErr instanceof BrowsecraftError, 'TimeoutError extends BrowsecraftError');
+		assert(timeoutErr.name === 'TimeoutError', 'name is correct');
+		assert(timeoutErr.elapsed === 30000, 'elapsed set on TimeoutError');
+
+		// Error with all notActionable reasons
+		for (const reason of ['not-visible', 'disabled', 'obscured', 'zero-size', 'detached']) {
+			const err = new ElementNotActionableError({
+				action: 'click',
+				target: 'btn',
+				reason,
+				elementState: { found: true },
+			});
+			assert(err.reason === reason, `ElementNotActionableError reason="${reason}" works`);
+		}
+	} catch (err) {
+		console.log(`  ${FAIL} Error classes test threw: ${err.message}`);
+		if (err.stack) console.log(`    ${err.stack.split('\n').slice(1, 3).join('\n    ')}`);
+		failed++;
+	}
+}
+
+// ============================================================================
+// Test 7: data-testid auto-detection in locator
+// ============================================================================
+
+async function testDataTestId() {
+	console.log(`\n${BOLD}Test 7: data-testid auto-detection${RESET}`);
+
+	let browser;
+	try {
+		browser = await Browser.launch({ headless: true });
+		const page = await browser.newPage();
+
+		// Navigate to a page and inject elements with data-testid
+		await page.goto('https://example.com');
+		await page.evaluate(`
+			const div = document.createElement('div');
+			div.setAttribute('data-testid', 'my-widget');
+			div.textContent = 'Widget Content';
+			document.body.appendChild(div);
+
+			const btn = document.createElement('button');
+			btn.setAttribute('data-test', 'submit-btn');
+			btn.textContent = 'Submit via data-test';
+			document.body.appendChild(btn);
+
+			const input = document.createElement('input');
+			input.setAttribute('data-test-id', 'email-input');
+			input.setAttribute('placeholder', 'Enter email');
+			document.body.appendChild(input);
+		`);
+
+		// page.getByTestId should find data-testid elements
+		const widget = page.getByTestId('my-widget');
+		const widgetText = await widget.textContent();
+		assertEq(widgetText, 'Widget Content', 'getByTestId("my-widget") found element');
+
+		// Verify getByTestId is visible
+		const widgetVisible = await widget.isVisible();
+		assert(widgetVisible, 'data-testid element is visible');
+
+		await page.close();
+	} catch (err) {
+		console.log(`  ${FAIL} data-testid test threw: ${err.message}`);
+		if (err.stack) console.log(`    ${err.stack.split('\n').slice(1, 3).join('\n    ')}`);
+		failed++;
+	} finally {
+		if (browser) {
+			await browser.close().catch(() => {});
+		}
+	}
+}
+
+// ============================================================================
+// Test 8: Built-in BDD step registration
+// ============================================================================
+
+async function testBuiltInSteps() {
+	console.log(`\n${BOLD}Test 8: Built-in BDD step definitions${RESET}`);
+
+	try {
+		// getBuiltInStepPatterns should return the list
+		const patterns = getBuiltInStepPatterns();
+		assert(Array.isArray(patterns), 'getBuiltInStepPatterns() returns an array');
+		assert(patterns.length >= 25, `At least 25 built-in steps (got ${patterns.length})`);
+
+		// Check key step types exist
+		const givenSteps = patterns.filter((s) => s.type === 'Given');
+		const whenSteps = patterns.filter((s) => s.type === 'When');
+		const thenSteps = patterns.filter((s) => s.type === 'Then');
+		assert(givenSteps.length >= 3, `At least 3 Given steps (got ${givenSteps.length})`);
+		assert(whenSteps.length >= 10, `At least 10 When steps (got ${whenSteps.length})`);
+		assert(thenSteps.length >= 5, `At least 5 Then steps (got ${thenSteps.length})`);
+
+		// Check specific patterns exist
+		const patternTexts = patterns.map((p) => p.pattern);
+		assert(patternTexts.includes('I am on {string}'), 'Has "I am on {string}" step');
+		assert(patternTexts.includes('I click {string}'), 'Has "I click {string}" step');
+		assert(
+			patternTexts.includes('I fill {string} with {string}'),
+			'Has "I fill {string} with {string}" step',
+		);
+		assert(patternTexts.includes('I should see {string}'), 'Has "I should see {string}" step');
+		assert(patternTexts.includes('I press {string}'), 'Has "I press {string}" step');
+		assert(patternTexts.includes('I select {string} from {string}'), 'Has select step');
+		assert(patternTexts.includes('I check {string}'), 'Has check step');
+		assert(patternTexts.includes('I hover over {string}'), 'Has hover step');
+		assert(patternTexts.includes('I drag {string} to {string}'), 'Has drag step');
+		assert(patternTexts.includes('the URL should contain {string}'), 'Has URL assertion step');
+		assert(patternTexts.includes('the title should be {string}'), 'Has title assertion step');
+
+		// registerBuiltInSteps on a fresh registry
+		const registry = new StepRegistry();
+		registerBuiltInSteps(registry);
+		const allSteps = registry.getAll();
+		assertEq(
+			allSteps.length,
+			patterns.length,
+			`Registry has ${patterns.length} steps after registration`,
+		);
+
+		// Verify matching works
+		const match = registry.match('I click "Submit"', 'When');
+		assert(match !== null, 'Registry matches "I click \\"Submit\\""');
+		assertEq(match?.args?.[0], 'Submit', 'Extracted arg is "Submit"');
+
+		const fillMatch = registry.match('I fill "Email" with "test@example.com"', 'When');
+		assert(fillMatch !== null, 'Registry matches fill step');
+		assertEq(fillMatch?.args?.[0], 'Email', 'Fill target is "Email"');
+		assertEq(fillMatch?.args?.[1], 'test@example.com', 'Fill value is "test@example.com"');
+
+		const navMatch = registry.match('I am on "https://example.com"', 'Given');
+		assert(navMatch !== null, 'Registry matches navigation step');
+		assertEq(navMatch?.args?.[0], 'https://example.com', 'Nav URL extracted correctly');
+
+		// registerBuiltInSteps is idempotent on global registry
+		const beforeCount = globalRegistry.getAll().length;
+		registerBuiltInSteps();
+		registerBuiltInSteps(); // second call should be no-op
+		const afterCount = globalRegistry.getAll().length;
+		assertEq(
+			afterCount,
+			beforeCount + patterns.length,
+			'registerBuiltInSteps is idempotent on second call',
+		);
+	} catch (err) {
+		console.log(`  ${FAIL} Built-in steps test threw: ${err.message}`);
+		if (err.stack) console.log(`    ${err.stack.split('\n').slice(1, 3).join('\n    ')}`);
+		failed++;
+	}
+}
+
+// ============================================================================
 // Run all tests
 // ============================================================================
 
@@ -314,6 +607,10 @@ async function main() {
 	await testBrowserAPI();
 	await testMultiplePages();
 	await testEvaluate();
+	await testEnglishAliases();
+	await testErrorClasses();
+	await testDataTestId();
+	await testBuiltInSteps();
 
 	const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 

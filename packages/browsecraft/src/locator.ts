@@ -10,7 +10,24 @@
 // ============================================================================
 
 import type { BiDiSession, Locator, NodeRemoteValue } from 'browsecraft-bidi';
+import { ElementNotFoundError } from './errors.js';
 import { type WaitOptions, waitFor } from './wait.js';
+
+/**
+ * Elements that only appear in <head> and should never be returned
+ * as visible/interactable elements. BiDi innerText locator can match
+ * <title> (e.g., searching for "Example Domain" matches <title>Example Domain</title>),
+ * which is always invisible and non-interactable.
+ */
+const HEAD_ONLY_ELEMENTS = new Set([
+	'title',
+	'meta',
+	'link',
+	'style',
+	'base',
+	'head',
+	'noscript', // can appear in head too
+]);
 
 /** What the user passes to click(), fill(), get() */
 export type ElementTarget = string | LocatorOptions;
@@ -59,45 +76,67 @@ export async function locateElement(
 	options: WaitOptions,
 ): Promise<LocatedElement> {
 	const opts = normalizeTarget(target);
+	const description = describeTarget(target);
+	const startTime = Date.now();
 
-	return waitFor(
-		describeTarget(target),
-		async () => {
-			// Try each strategy in order
-			const strategies = buildStrategies(opts);
+	try {
+		return await waitFor(
+			description,
+			async () => {
+				// Try each strategy in order
+				const strategies = buildStrategies(opts);
 
-			for (const { locator, strategy, isLabelLookup } of strategies) {
-				try {
-					const result = await session.browsingContext.locateNodes({
-						context: contextId,
-						locator,
-						maxNodeCount: (opts.index ?? 0) + 10, // fetch extra for label resolution
-					});
+				for (const { locator, strategy, isLabelLookup } of strategies) {
+					try {
+						const result = await session.browsingContext.locateNodes({
+							context: contextId,
+							locator,
+							maxNodeCount: (opts.index ?? 0) + 10, // fetch extra for label resolution
+						});
 
-					if (result.nodes.length > 0) {
-						// If this is a label lookup, we need to find <label> elements
-						// and resolve their `for` attribute to the associated input
-						if (isLabelLookup) {
-							const resolved = await resolveLabelsToInputs(session, contextId, result.nodes);
-							if (resolved) {
-								return { node: resolved, strategy };
+						// Filter out <head>-only elements (title, meta, style, etc.)
+						// BiDi innerText locator can match <title> which is never interactable
+						const nodes = result.nodes.filter(
+							(n) => !HEAD_ONLY_ELEMENTS.has(n.value?.localName ?? ''),
+						);
+
+						if (nodes.length > 0) {
+							// If this is a label lookup, we need to find <label> elements
+							// and resolve their `for` attribute to the associated input
+							if (isLabelLookup) {
+								const resolved = await resolveLabelsToInputs(session, contextId, nodes);
+								if (resolved) {
+									return { node: resolved, strategy };
+								}
+								continue;
 							}
-							continue;
-						}
 
-						const nodeIndex = opts.index ?? 0;
-						const node = result.nodes[nodeIndex];
-						if (node) {
-							return { node, strategy };
+							const nodeIndex = opts.index ?? 0;
+							const node = nodes[nodeIndex];
+							if (node) {
+								return { node, strategy };
+							}
 						}
-					}
-				} catch {}
-			}
+					} catch {}
+				}
 
-			return null; // Not found yet -- waitFor will retry
-		},
-		options,
-	);
+				return null; // Not found yet -- waitFor will retry
+			},
+			options,
+		);
+	} catch (err) {
+		const elapsed = Date.now() - startTime;
+
+		// Try to find similar elements for suggestions
+		const suggestions = await findSimilarElements(session, contextId, target);
+
+		throw new ElementNotFoundError({
+			action: 'find',
+			target: typeof target === 'string' ? target : description,
+			elapsed,
+			suggestions,
+		});
+	}
 }
 
 /**
@@ -119,8 +158,10 @@ export async function locateAllElements(
 				maxNodeCount: 1000,
 			});
 
-			if (result.nodes.length > 0) {
-				return result.nodes.map((node) => ({ node, strategy }));
+			const nodes = result.nodes.filter((n) => !HEAD_ONLY_ELEMENTS.has(n.value?.localName ?? ''));
+
+			if (nodes.length > 0) {
+				return nodes.map((node) => ({ node, strategy }));
 			}
 		} catch {}
 	}
@@ -219,7 +260,16 @@ function buildStrategies(
 			strategy: `innerText("${name}")`,
 		});
 
-		// Strategy 3: CSS fallback -- maybe it's a selector
+		// Strategy 3: data-testid -- maybe it's a test ID
+		strategies.push({
+			locator: {
+				type: 'css',
+				value: `[data-testid="${name}"], [data-test="${name}"], [data-test-id="${name}"]`,
+			},
+			strategy: `data-testid("${name}")`,
+		});
+
+		// Strategy 4: CSS fallback -- maybe it's a selector
 		if (name.match(/^[#.\[a-z]/i)) {
 			strategies.push({
 				locator: { type: 'css', value: name },
@@ -325,4 +375,63 @@ async function resolveLabelsToInputs(
 	}
 
 	return null;
+}
+
+/**
+ * Try to find similar elements on the page to provide suggestions
+ * when an element is not found.
+ */
+async function findSimilarElements(
+	session: BiDiSession,
+	contextId: string,
+	target: ElementTarget,
+): Promise<string[]> {
+	const searchText =
+		typeof target === 'string' ? target : (target.name ?? target.text ?? target.label ?? '');
+	if (!searchText) return [];
+
+	try {
+		const result = await session.script.callFunction({
+			functionDeclaration: `function(searchText) {
+				const suggestions = [];
+				const lower = searchText.toLowerCase();
+
+				// Look at all interactive elements and visible text
+				const interactiveSelectors = 'button, a, input, select, textarea, [role="button"], [role="link"], [role="tab"], [role="menuitem"]';
+				const elements = document.querySelectorAll(interactiveSelectors);
+
+				for (const el of elements) {
+					const text = (el.innerText || el.textContent || '').trim();
+					const ariaLabel = el.getAttribute('aria-label') || '';
+					const placeholder = el.getAttribute('placeholder') || '';
+					const value = el.getAttribute('value') || '';
+					const title = el.getAttribute('title') || '';
+
+					const candidates = [text, ariaLabel, placeholder, value, title].filter(Boolean);
+					for (const c of candidates) {
+						if (c.toLowerCase().includes(lower.slice(0, 3)) || lower.includes(c.toLowerCase().slice(0, 3))) {
+							const tag = el.tagName.toLowerCase();
+							const desc = c.length > 40 ? c.slice(0, 40) + '...' : c;
+							suggestions.push('<' + tag + '> "' + desc + '"');
+							break;
+						}
+					}
+
+					if (suggestions.length >= 5) break;
+				}
+
+				return suggestions;
+			}`,
+			target: { context: contextId },
+			arguments: [{ type: 'string', value: searchText }],
+			awaitPromise: false,
+		});
+
+		if (result.type === 'success' && result.result?.type === 'array') {
+			const arr = result.result.value as Array<{ type: string; value: string }>;
+			return arr.filter((item) => item?.type === 'string').map((item) => item.value);
+		}
+	} catch {}
+
+	return [];
 }

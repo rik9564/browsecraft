@@ -36,7 +36,23 @@ export type { BrowsecraftConfig, UserConfig, AIConfig } from './config.js';
 // Browser & Page (for advanced usage / scripting)
 export { Browser, BrowserContext } from './browser.js';
 export { Page, ElementHandle } from './page.js';
-export type { GotoOptions, ClickOptions, FillOptions, MockResponse } from './page.js';
+export type {
+	GotoOptions,
+	ClickOptions,
+	FillOptions,
+	MockResponse,
+	InterceptedRequest,
+} from './page.js';
+
+// Errors — rich diagnostics
+export {
+	BrowsecraftError,
+	ElementNotFoundError,
+	ElementNotActionableError,
+	NetworkError,
+	TimeoutError,
+} from './errors.js';
+export type { ElementState } from './errors.js';
 
 // Re-export cookie types for convenience
 export type { StorageCookie } from 'browsecraft-bidi';
@@ -111,3 +127,6 @@ export type { ScenarioContext, TsBddOptions } from 'browsecraft-bdd';
 // AI auto-step generation (Mode 3)
 export { autoGenerateSteps, autoGenerateStepsFromDocument } from 'browsecraft-bdd';
 export type { AutoStepResult, AutoStepOptions, GeneratedStepDef } from 'browsecraft-bdd';
+
+// Built-in step definitions
+export { registerBuiltInSteps, getBuiltInStepPatterns } from 'browsecraft-bdd';

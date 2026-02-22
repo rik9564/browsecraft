@@ -16,13 +16,20 @@ import type {
 	StorageCookie,
 } from 'browsecraft-bidi';
 import type { BrowsecraftConfig } from './config.js';
+import { ElementNotActionableError } from './errors.js';
 import {
 	type ElementTarget,
 	type LocatedElement,
 	locateAllElements,
 	locateElement,
 } from './locator.js';
-import { type WaitOptions, waitFor, waitForLoadState } from './wait.js';
+import {
+	type ActionabilityResult,
+	type WaitOptions,
+	waitFor,
+	waitForActionable,
+	waitForLoadState,
+} from './wait.js';
 
 /** Options for page.goto() */
 export interface GotoOptions {
@@ -58,6 +65,16 @@ export interface MockResponse {
 	body?: string | Record<string, unknown>;
 	/** Content type (default: 'application/json' for objects, 'text/plain' for strings) */
 	contentType?: string;
+}
+
+/** Request info passed to intercept handlers */
+export interface InterceptedRequest {
+	/** The full URL of the request */
+	url: string;
+	/** HTTP method (GET, POST, etc.) */
+	method: string;
+	/** Request headers */
+	headers: Record<string, string>;
 }
 
 /**
@@ -155,6 +172,7 @@ export class Page {
 		const timeout = options?.timeout ?? this.config.timeout;
 		const located = await locateElement(this.session, this.contextId, target, { timeout });
 
+		await this.ensureActionable(located, 'click', target, { timeout });
 		await this.scrollIntoViewAndClick(located, options);
 	}
 
@@ -175,6 +193,8 @@ export class Page {
 			typeof target === 'string' ? { label: target, name: target } : target;
 
 		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
+
+		await this.ensureActionable(located, 'fill', target, { timeout });
 
 		// Clear existing value and type new one
 		const ref = this.getSharedRef(located.node);
@@ -220,6 +240,8 @@ export class Page {
 
 		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
 
+		await this.ensureActionable(located, 'type', target, { timeout });
+
 		// Focus the element first
 		const ref = this.getSharedRef(located.node);
 		await this.session.script.callFunction({
@@ -255,6 +277,9 @@ export class Page {
 			typeof target === 'string' ? { label: target, name: target } : target;
 
 		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
+
+		await this.ensureActionable(located, 'select', target, { timeout });
+
 		const ref = this.getSharedRef(located.node);
 
 		await this.session.script.callFunction({
@@ -284,6 +309,9 @@ export class Page {
 	async check(target: ElementTarget, options?: ClickOptions): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
 		const located = await locateElement(this.session, this.contextId, target, { timeout });
+
+		await this.ensureActionable(located, 'check', target, { timeout });
+
 		const ref = this.getSharedRef(located.node);
 
 		// Only click if not already checked
@@ -310,6 +338,9 @@ export class Page {
 	async uncheck(target: ElementTarget, options?: ClickOptions): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
 		const located = await locateElement(this.session, this.contextId, target, { timeout });
+
+		await this.ensureActionable(located, 'uncheck', target, { timeout });
+
 		const ref = this.getSharedRef(located.node);
 
 		const result = await this.session.script.callFunction({
@@ -339,6 +370,9 @@ export class Page {
 	async hover(target: ElementTarget, options?: { timeout?: number }): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
 		const located = await locateElement(this.session, this.contextId, target, { timeout });
+
+		await this.ensureActionable(located, 'hover', target, { timeout });
+
 		const ref = this.getSharedRef(located.node);
 
 		// Scroll into view first so coordinates are accurate
@@ -749,6 +783,9 @@ export class Page {
 	async tap(target: ElementTarget, options?: { timeout?: number }): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
 		const located = await locateElement(this.session, this.contextId, target, { timeout });
+
+		await this.ensureActionable(located, 'tap', target, { timeout });
+
 		const ref = this.getSharedRef(located.node);
 
 		// Scroll into view
@@ -791,6 +828,9 @@ export class Page {
 		const resolvedTarget: ElementTarget =
 			typeof target === 'string' ? { label: target, name: target } : target;
 		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
+
+		await this.ensureActionable(located, 'focus', target, { timeout, enabled: false });
+
 		const ref = this.getSharedRef(located.node);
 
 		await this.session.script.callFunction({
@@ -907,6 +947,9 @@ export class Page {
 		const resolvedTarget: ElementTarget =
 			typeof target === 'string' ? { label: target, name: target } : target;
 		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
+
+		await this.ensureActionable(located, 'selectOption', target, { timeout });
+
 		const ref = this.getSharedRef(located.node);
 		const valuesArray = Array.isArray(values) ? values : [values];
 
@@ -1113,6 +1156,251 @@ export class Page {
 	}
 
 	// -----------------------------------------------------------------------
+	// English API aliases — reads like instructions to a person
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Navigate to a URL. English-friendly alias for goto().
+	 *
+	 * ```ts
+	 * await page.go('https://example.com');
+	 * await page.go('/login');
+	 * ```
+	 */
+	async go(url: string, options?: GotoOptions): Promise<void> {
+		return this.goto(url, options);
+	}
+
+	/**
+	 * Assert that an element with the given text is visible on the page.
+	 * Returns the ElementHandle for further assertions.
+	 *
+	 * ```ts
+	 * await page.see('Welcome back!');
+	 * await page.see('Products');
+	 * await page.see({ role: 'heading', name: 'Dashboard' });
+	 * ```
+	 */
+	async see(target: ElementTarget, options?: { timeout?: number }): Promise<ElementHandle> {
+		const timeout = options?.timeout ?? this.config.timeout;
+		const startTime = Date.now();
+
+		// Step 1: Locate the element (auto-waits for it to exist in DOM)
+		const located = await locateElement(this.session, this.contextId, target, { timeout });
+		const ref = this.getSharedRef(located.node);
+
+		// Step 2: Poll until the element is visible (handles CSS transitions, lazy rendering, etc.)
+		const elapsed = Date.now() - startTime;
+		const remaining = Math.max(timeout - elapsed, 5000);
+		await waitFor(
+			`${describeTarget(target)} to be visible`,
+			async () => {
+				try {
+					const result = await this.session.script.callFunction({
+						functionDeclaration: `function(el) {
+							const style = window.getComputedStyle(el);
+							const rect = el.getBoundingClientRect();
+							return style.display !== 'none' && style.visibility !== 'hidden' &&
+								style.opacity !== '0' && rect.width > 0 && rect.height > 0;
+						}`,
+						target: { context: this.contextId },
+						arguments: [ref],
+						awaitPromise: false,
+					});
+					if (
+						result.type === 'success' &&
+						result.result?.type === 'boolean' &&
+						(result.result as { value: boolean }).value === true
+					) {
+						return true;
+					}
+					return null;
+				} catch {
+					return null;
+				}
+			},
+			{ timeout: remaining },
+		);
+
+		return new ElementHandle(this, target);
+	}
+
+	// -----------------------------------------------------------------------
+	// Network interception & observation
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Intercept network requests matching a pattern. Calls your handler
+	 * for each matching request, letting you modify or respond to it.
+	 *
+	 * ```ts
+	 * await page.intercept('POST /api/login', async (request) => {
+	 *   // Modify request, or provide a response
+	 *   return { status: 200, body: { token: 'abc' } };
+	 * });
+	 * ```
+	 */
+	async intercept(
+		pattern: string,
+		handler: (
+			request: InterceptedRequest,
+		) => Promise<MockResponse | undefined> | MockResponse | undefined,
+	): Promise<void> {
+		const { method, urlPattern } = parseMockPattern(pattern);
+
+		await this.session.subscribe(['network.beforeRequestSent'], [this.contextId]);
+
+		const result = await this.session.network.addIntercept({
+			phases: ['beforeRequestSent'],
+			urlPatterns: [urlPattern],
+			contexts: [this.contextId],
+		});
+		this.interceptIds.push(result.intercept);
+
+		const unsubscribe = this.session.on('network.beforeRequestSent', async (event) => {
+			const params = event.params as {
+				context: string;
+				request: {
+					request: string;
+					method: string;
+					url: string;
+					headers: Array<{ name: string; value: { type: string; value: string } }>;
+				};
+				isBlocked: boolean;
+				intercepts?: string[];
+			};
+
+			if (!params.isBlocked || params.context !== this.contextId) return;
+			if (!params.intercepts?.includes(result.intercept)) return;
+
+			if (method && params.request.method.toUpperCase() !== method.toUpperCase()) {
+				await this.session.network.continueRequest({ request: params.request.request });
+				return;
+			}
+
+			const reqInfo: InterceptedRequest = {
+				url: params.request.url,
+				method: params.request.method,
+				headers: Object.fromEntries(params.request.headers.map((h) => [h.name, h.value.value])),
+			};
+
+			try {
+				const response = await handler(reqInfo);
+				if (response) {
+					const headers = buildMockHeaders(response);
+					const body = buildMockBody(response);
+					await this.session.network.provideResponse({
+						request: params.request.request,
+						statusCode: response.status ?? 200,
+						headers,
+						body: body ? { type: 'string', value: body } : undefined,
+					});
+				} else {
+					await this.session.network.continueRequest({ request: params.request.request });
+				}
+			} catch {
+				await this.session.network.continueRequest({ request: params.request.request });
+			}
+		});
+		this.eventCleanups.push(unsubscribe);
+	}
+
+	/**
+	 * Wait for a network response matching a URL pattern.
+	 *
+	 * ```ts
+	 * const response = await page.waitForResponse('/api/users');
+	 * console.log(response.status); // 200
+	 * ```
+	 */
+	async waitForResponse(
+		urlPattern: string | RegExp,
+		options?: { timeout?: number; method?: string },
+	): Promise<{ url: string; status: number; method: string }> {
+		const timeout = options?.timeout ?? this.config.timeout;
+		const method = options?.method?.toUpperCase();
+
+		await this.session.subscribe(['network.responseCompleted'], [this.contextId]);
+
+		try {
+			const event = await this.session.waitForEvent(
+				'network.responseCompleted',
+				(e) => {
+					const params = e.params as {
+						context: string;
+						request: { method: string; url: string };
+						response: { status: number };
+					};
+					if (params.context !== this.contextId) return false;
+					if (method && params.request.method.toUpperCase() !== method) return false;
+
+					const url = params.request.url;
+					if (typeof urlPattern === 'string') {
+						return url.includes(urlPattern);
+					}
+					return urlPattern.test(url);
+				},
+				timeout,
+			);
+
+			const params = event.params as {
+				request: { method: string; url: string };
+				response: { status: number };
+			};
+			return {
+				url: params.request.url,
+				status: params.response.status,
+				method: params.request.method,
+			};
+		} finally {
+			await this.session
+				.unsubscribe(['network.responseCompleted'], [this.contextId])
+				.catch(() => {});
+		}
+	}
+
+	/**
+	 * Block network requests matching URL patterns (e.g., ads, analytics).
+	 *
+	 * ```ts
+	 * await page.blockRequests(['*.google-analytics.com*', '*.doubleclick.net*']);
+	 * await page.blockRequests(['/api/telemetry']);
+	 * ```
+	 */
+	async blockRequests(patterns: string[]): Promise<void> {
+		await this.session.subscribe(['network.beforeRequestSent'], [this.contextId]);
+
+		for (const pattern of patterns) {
+			const urlPattern = pattern.startsWith('http')
+				? { type: 'string' as const, pattern }
+				: { type: 'pattern' as const, pathname: pattern };
+
+			const result = await this.session.network.addIntercept({
+				phases: ['beforeRequestSent'],
+				urlPatterns: [urlPattern],
+				contexts: [this.contextId],
+			});
+			this.interceptIds.push(result.intercept);
+
+			const unsubscribe = this.session.on('network.beforeRequestSent', async (event) => {
+				const params = event.params as {
+					context: string;
+					request: { request: string; url: string };
+					isBlocked: boolean;
+					intercepts?: string[];
+				};
+
+				if (!params.isBlocked || params.context !== this.contextId) return;
+				if (!params.intercepts?.includes(result.intercept)) return;
+
+				// Fail the request (block it)
+				await this.session.network.failRequest({ request: params.request.request });
+			});
+			this.eventCleanups.push(unsubscribe);
+		}
+	}
+
+	// -----------------------------------------------------------------------
 	// Lifecycle
 	// -----------------------------------------------------------------------
 
@@ -1161,6 +1449,42 @@ export class Page {
 	// -----------------------------------------------------------------------
 	// Private helpers
 	// -----------------------------------------------------------------------
+
+	/**
+	 * Ensure an element is actionable (visible + enabled) before interacting.
+	 * Throws a rich ElementNotActionableError if it's not ready within the timeout.
+	 */
+	private async ensureActionable(
+		located: LocatedElement,
+		action: string,
+		target: ElementTarget,
+		options: { timeout: number; enabled?: boolean },
+	): Promise<void> {
+		const ref = this.getSharedRef(located.node);
+		const targetDesc = typeof target === 'string' ? target : describeTarget(target);
+
+		const result = await waitForActionable(
+			this.session,
+			this.contextId,
+			ref,
+			targetDesc,
+			{ timeout: Math.min(options.timeout, 5000) },
+			{
+				visible: true,
+				enabled: options.enabled !== false,
+			},
+		);
+
+		if (!result.actionable && result.reason) {
+			throw new ElementNotActionableError({
+				action,
+				target: targetDesc,
+				reason: result.reason,
+				elementState: result.state,
+				elapsed: options.timeout,
+			});
+		}
+	}
 
 	/** Resolve a relative URL against the baseURL */
 	private resolveURL(url: string): string {
@@ -1638,6 +1962,19 @@ export class ElementHandle {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Human-readable description of a target (for error messages) */
+function describeTarget(target: ElementTarget): string {
+	if (typeof target === 'string') return target;
+	const parts: string[] = [];
+	if (target.role) parts.push(`role="${target.role}"`);
+	if (target.name) parts.push(`name="${target.name}"`);
+	if (target.text) parts.push(`text="${target.text}"`);
+	if (target.label) parts.push(`label="${target.label}"`);
+	if (target.testId) parts.push(`testId="${target.testId}"`);
+	if (target.selector) parts.push(`selector="${target.selector}"`);
+	return `[${parts.join(', ')}]`;
+}
 
 /** Map friendly key names to WebDriver key codes */
 function mapKey(key: string): string {
