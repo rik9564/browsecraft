@@ -1,0 +1,30 @@
+{
+  "name": "browsecraft-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Browsecraft - AI-native browser automation framework built on WebDriver BiDi",
+  "license": "MIT",
+  "author": "Browsecraft Contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AchilleasCH/browsecraft.git"
+  },
+  "homepage": "https://github.com/AchilleasCH/browsecraft#readme",
+  "bugs": {
+    "url": "https://github.com/AchilleasCH/browsecraft/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean"
+  }
+}
