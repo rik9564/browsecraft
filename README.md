@@ -4,24 +4,31 @@ Browser automation that just works. No CSS selectors required.
 
 Browsecraft is a browser automation and testing framework built from scratch on the W3C WebDriver BiDi protocol. It controls real, unpatched browsers with an API designed for humans.
 
-```ts
-import { test, expect } from 'browsecraft';
+```js
+import { Browser } from 'browsecraft';
 
-test('add to cart', async ({ page }) => {
-  await page.goto('https://shop.example.com');
-  await page.click('Add to Cart');
-  await page.click('Checkout');
-  await expect(page).toHaveURL(/checkout/);
-});
+const browser = await Browser.launch();
+const page = await browser.newPage();
+
+await page.goto('https://www.saucedemo.com');
+await page.fill({ selector: '[data-test="username"]' }, 'standard_user');
+await page.fill({ selector: '[data-test="password"]' }, 'secret_sauce');
+await page.click({ selector: '[data-test="login-button"]' });
+
+await page.waitForURL('inventory');
+console.log(await page.title()); // "Swag Labs"
+
+await browser.close();
 ```
 
 ## Why Browsecraft?
 
-- **No selectors needed** — `page.click('Submit')` finds buttons by visible text, aria-label, or role. CSS/XPath is an escape hatch, not the default.
-- **Zero config** — `npx browsecraft test` runs your tests. No config file, no setup wizard.
-- **Built on BiDi** — uses the W3C WebDriver BiDi protocol for first-class browser control. Not a CDP wrapper.
-- **AI-native (optional)** — self-healing selectors, natural language test generation, and visual regression powered by local AI (Ollama). Works perfectly without it.
-- **TypeScript-first** — written in TypeScript with full type safety. JavaScript works too.
+- **Simple API** — `page.click('Submit')` finds buttons by visible text. CSS selectors work too, but they're the escape hatch, not the default.
+- **Zero config** — No config files, no setup wizards. Install and write tests.
+- **Built on BiDi** — Uses the W3C WebDriver BiDi protocol for first-class browser control. Not a CDP wrapper.
+- **Built-in BDD** — Full Gherkin parser and BDD executor built from scratch. No Cucumber dependency.
+- **AI-native (optional)** — Self-healing selectors, test generation, and visual regression powered by [GitHub Models API](https://github.com/marketplace/models) (free). Works perfectly without it.
+- **TypeScript-first** — Written in TypeScript. JavaScript works too.
 
 ## Quick Start
 
@@ -29,182 +36,346 @@ test('add to cart', async ({ page }) => {
 npm install browsecraft
 ```
 
-Write a test:
+### Imperative Style
 
-```ts
-// tests/login.test.ts
-import { test, expect } from 'browsecraft';
+```js
+import { Browser } from 'browsecraft';
 
-test('user can log in', async ({ page }) => {
-  await page.goto('https://myapp.com/login');
-  await page.fill('#email', 'user@example.com');
-  await page.fill('#password', 'password123');
-  await page.click('Sign In');
+const browser = await Browser.launch({ headless: true });
+const page = await browser.newPage();
 
-  await expect(page).toHaveURL('/dashboard');
-  await expect(page).toHaveTitle('Dashboard');
-});
+await page.goto('https://example.com');
+const title = await page.title();
+console.log(title);
+
+await browser.close();
 ```
 
-Run it:
+### BDD with .feature Files
+
+Write scenarios in plain English:
+
+```gherkin
+# features/login.feature
+Feature: User Login
+
+  Scenario: Successful login
+    Given I am on the login page
+    When I fill "Username" with "standard_user"
+    And I fill "Password" with "secret_sauce"
+    And I click "Login"
+    Then I should see "Products"
+```
+
+Wire them up with step definitions:
+
+```js
+import { Browser } from 'browsecraft';
+import { parseGherkin, Given, When, Then, BddExecutor, globalRegistry } from 'browsecraft-bdd';
+import { readFileSync } from 'node:fs';
+
+Given('I am on the login page', async (world) => {
+  await world.page.goto('https://www.saucedemo.com');
+});
+
+When('I fill {string} with {string}', async (world, field, value) => {
+  const selectors = { 'Username': '[data-test="username"]', 'Password': '[data-test="password"]' };
+  await world.page.fill({ selector: selectors[field] }, value);
+});
+
+When('I click {string}', async (world, text) => {
+  await world.page.click(text); // finds by visible text
+});
+
+Then('I should see {string}', async (world, text) => {
+  const content = await world.page.content();
+  if (!content.includes(text)) throw new Error(`Expected "${text}" on page`);
+});
+
+// Run it
+const browser = await Browser.launch();
+const doc = parseGherkin(readFileSync('features/login.feature', 'utf-8'));
+
+const executor = new BddExecutor({
+  registry: globalRegistry,
+  worldFactory: async () => ({
+    page: await browser.newPage(),
+    browser,
+    ctx: {},
+    attach: () => {},
+    log: console.log,
+  }),
+});
+
+const result = await executor.runDocument(doc);
+console.log(`${result.summary.scenarios.passed}/${result.summary.scenarios.total} passed`);
+await browser.close();
+```
+
+### BDD in Pure TypeScript (No .feature files)
+
+```js
+import { Browser } from 'browsecraft';
+import { feature, scenario, given, when, then, and, runFeatures } from 'browsecraft-bdd';
+
+feature('User Login', () => {
+  scenario('Successful login', ({ page }) => {
+    given('I am on the login page', async () => {
+      await page.goto('https://www.saucedemo.com');
+    });
+
+    when('I enter valid credentials', async () => {
+      await page.fill({ selector: '[data-test="username"]' }, 'standard_user');
+      await page.fill({ selector: '[data-test="password"]' }, 'secret_sauce');
+    });
+
+    and('I click the login button', async () => {
+      await page.click({ selector: '[data-test="login-button"]' });
+    });
+
+    then('I should see the products page', async () => {
+      await page.waitForURL('inventory');
+    });
+  });
+});
+
+const browser = await Browser.launch();
+const result = await runFeatures({
+  worldFactory: async () => ({
+    page: await browser.newPage(),
+    browser,
+    ctx: {},
+    attach: () => {},
+    log: console.log,
+  }),
+});
+console.log(`${result.summary.scenarios.passed}/${result.summary.scenarios.total} passed`);
+await browser.close();
+```
+
+## Examples
+
+The [`examples/`](examples/) directory contains complete, runnable starter projects:
+
+| Example | Description |
+| --- | --- |
+| [`getting-started/`](examples/getting-started/) | Simple imperative tests — login, cart, checkout, screenshots |
+| [`bdd-gherkin/`](examples/bdd-gherkin/) | Classic BDD with `.feature` files + step definitions |
+| [`bdd-typescript/`](examples/bdd-typescript/) | TypeScript-native BDD — `feature()`, `scenario()`, `given()`, `when()`, `then()` |
+
+Each example uses the [Sauce Labs Demo App](https://www.saucedemo.com) and supports `--headed` and `--maximized` flags:
 
 ```bash
-npx browsecraft test
+cd examples/getting-started
+npm install
+node test.mjs              # headless
+node test.mjs --headed     # watch it run
+node test.mjs --maximized  # full screen
 ```
 
 ## API Reference
 
+### Browser
+
+```js
+import { Browser } from 'browsecraft';
+
+// Launch
+const browser = await Browser.launch({
+  browser: 'chrome',    // 'chrome' | 'firefox' | 'edge'
+  headless: true,       // default: true
+  maximized: false,     // maximize the window (headed only)
+});
+
+// Create pages
+const page = await browser.newPage();
+const page2 = await browser.newPage(); // multiple tabs
+
+// Properties
+browser.openPages;    // array of open pages
+browser.isConnected;  // connection status
+
+await browser.close();
+```
+
 ### Navigation
 
-```ts
+```js
 await page.goto('https://example.com');
-await page.waitForURL(/dashboard/);
-await page.waitForLoadState();          // 'load' | 'domcontentloaded' | 'networkidle'
+await page.url();                         // current URL
+await page.title();                       // page title
+await page.content();                     // page HTML
+await page.waitForURL('dashboard');       // wait for URL to contain string
+await page.waitForURL(/dashboard/);       // or regex
 ```
 
 ### Actions
 
-```ts
-// Click — finds by visible text, aria-label, or CSS
-await page.click('Submit');
-await page.click('[data-testid="btn"]');
+```js
+// Click — string finds by visible text, object form for CSS selectors
+await page.click('Submit');                          // by visible text
+await page.click({ selector: '[data-test="btn"]' }); // by CSS selector
 
-// Fill — works with React, Vue, Angular controlled inputs
-await page.fill('#email', 'user@example.com');
+// Fill — clears existing value and types new value
+await page.fill({ selector: '#email' }, 'user@example.com');
 
-// Type — character by character (real keyboard events)
-await page.type('#search', 'browsecraft');
-
-// Other actions
-await page.check('#agree');
-await page.hover('.menu-item');
-await page.dblclick('.editable');
-await page.tap('.mobile-button');
-await page.focus('#input');
-await page.blur('#input');
-await page.select('#country', 'US');
-await page.selectOption('#multi', ['a', 'b', 'c']);
+// Smart locator — finds by label, placeholder, or visible text
+await page.fill('Email', 'user@example.com');
 ```
 
-### Selectors
+### Finding Elements
 
-Browsecraft uses a smart resolution chain. Pass a string and it will try:
+```js
+// By CSS selector
+const el = await page.get({ selector: '.product-card' });
 
-1. **Accessibility** — aria-label, role, alt text
-2. **Visible text** — button text, link text, label text
-3. **CSS selector** — as a fallback
+// By visible text
+const btn = await page.getByText('Add to Cart');
 
-```ts
-// All of these find the same button:
-await page.click('Submit');                    // by visible text
-await page.click('[aria-label="Submit"]');     // by aria-label
-await page.click('button.submit-btn');         // by CSS
-
-// Object form for precision:
-await page.click({ text: 'Submit', tag: 'button' });
+// Element properties
+await el.textContent();
+await el.isVisible();
+await el.getAttribute('href');
 ```
 
-### Assertions
+### Waiting
 
-All assertions auto-retry with configurable timeout:
-
-```ts
-import { expect } from 'browsecraft';
-
-// Page assertions
-await expect(page).toHaveTitle('Dashboard');
-await expect(page).toHaveURL(/\/dashboard/);
-await expect(page).toHaveContent('Welcome back');
-
-// Element assertions
-const button = await page.getByText('Submit');
-await expect(button).toBeVisible();
-await expect(button).toBeEnabled();
-await expect(button).toHaveText('Submit');
-await expect(button).toHaveAttribute('type', 'submit');
-await expect(button).toHaveCSS('color', 'rgb(255, 0, 0)');
-await expect(button).toHaveCount(1);
-
-// Negation
-await expect(button).not.toBeVisible();
-```
-
-### Screenshots
-
-```ts
-// Full page
-await page.screenshot('screenshots/home.png');
-
-// Element-level
-const card = await page.getByText('Product');
-await card.screenshot('screenshots/product-card.png');
+```js
+await page.waitForSelector({ selector: '.loaded' });
+await page.waitForURL('checkout');
+await page.waitForURL(/success/);
 ```
 
 ### Evaluate
 
 Run JavaScript in the browser:
 
-```ts
-const count = await page.evaluate(() => {
-  return document.querySelectorAll('.item').length;
+```js
+// String expression
+const count = await page.evaluate('document.querySelectorAll(".item").length');
+
+// Complex return types work: strings, numbers, booleans, arrays, objects, null
+const data = await page.evaluate('({ name: "test", items: [1, 2, 3] })');
+```
+
+### Screenshots
+
+```js
+const buffer = await page.screenshot(); // returns Buffer (PNG)
+
+import { writeFileSync } from 'node:fs';
+writeFileSync('screenshot.png', buffer);
+```
+
+### Cookies
+
+```js
+await page.clearCookies();   // clear all cookies for the current page
+await page.getCookies();     // get all cookies
+```
+
+### Page Lifecycle
+
+```js
+await page.close();    // close the tab
+await page.innerText({ selector: '.message' }); // get inner text of element
+```
+
+## BDD Framework
+
+Browsecraft includes a full BDD framework built from scratch — no Cucumber or third-party dependency.
+
+### Three Modes
+
+1. **Classic Gherkin** — Write `.feature` files, register step definitions with `Given`/`When`/`Then`, run with `BddExecutor`
+2. **TypeScript-native** — Use `feature()`, `scenario()`, `given()`, `when()`, `then()` directly in code. No `.feature` files needed.
+3. **AI-assisted** — Write `.feature` files only. AI generates step definitions automatically (requires GitHub Models API token).
+
+### Step Definitions (Classic Gherkin)
+
+```js
+import { Given, When, Then } from 'browsecraft-bdd';
+
+// {string} captures quoted arguments
+Given('I am on the {string} page', async (world, pageName) => {
+  await world.page.goto(`https://example.com/${pageName}`);
+});
+
+// {int} captures integers, {float} captures decimals
+Then('I should see {int} products', async (world, count) => {
+  // count is a number
 });
 ```
 
-### Browser & Contexts
+### Tag Filtering
 
-```ts
-import { Browser } from 'browsecraft';
-
-const browser = await Browser.launch('chrome');  // 'chrome' | 'firefox' | 'edge'
-const page = await browser.newPage();
-
-// Multiple pages
-const page2 = await browser.newPage();
-
-await browser.close();
+```gherkin
+@smoke
+Scenario: Quick test
+  ...
 ```
 
-### Waiting
-
-```ts
-await page.waitForSelector('.loaded');
-await page.waitForSelector('.modal', { state: 'hidden' });
-await page.waitForURL(/success/);
-await page.waitForFunction(() => window.appReady === true);
-```
-
-### Dialog Handling
-
-```ts
-page.onDialog(async (dialog) => {
-  console.log(dialog.message);
-  await dialog.accept('yes');
+```js
+const executor = new BddExecutor({
+  registry: globalRegistry,
+  tagFilter: '@smoke and not @slow',
+  // ...
 });
 ```
 
-### Network Mocking
+Tag expressions support `and`, `or`, `not`, and parentheses.
 
-```ts
-await page.mock('**/api/users', {
-  status: 200,
-  body: JSON.stringify([{ name: 'Alice' }]),
-});
+### Hooks
+
+```js
+import { Before, After, BeforeAll, AfterAll, BeforeFeature, AfterFeature } from 'browsecraft-bdd';
+
+BeforeAll(async () => { /* setup */ });
+AfterAll(async () => { /* teardown */ });
+
+Before(async (context) => { /* before each scenario */ });
+After(async (context) => { /* after each scenario */ });
+
+BeforeFeature(async (context) => { /* before each feature */ });
+AfterFeature(async (context) => { /* after each feature */ });
+```
+
+### Gherkin Parser
+
+The built-in parser supports:
+
+- Features, Scenarios, Scenario Outlines with Examples tables
+- Background steps
+- Data Tables and Doc Strings
+- Tags (on features and scenarios)
+- Rules
+- Comments
+- Multiple languages (English, Spanish, French, German, Japanese, and more)
+
+```js
+import { parseGherkin, getSupportedLanguages } from 'browsecraft-bdd';
+
+const doc = parseGherkin(featureText, 'login.feature');
+console.log(doc.feature.name);       // "User Login"
+console.log(doc.feature.children);   // scenarios, backgrounds, rules
+
+getSupportedLanguages(); // ['en', 'es', 'fr', 'de', 'ja', ...]
 ```
 
 ## AI Features (Optional)
 
-AI features require [Ollama](https://ollama.ai) running locally. Everything works perfectly without it.
+AI features use the [GitHub Models API](https://github.com/marketplace/models) — free with a GitHub PAT that has the `models` scope. Everything works perfectly without AI.
 
 ```bash
-# Install Ollama, then pull a model:
-ollama pull llama3.1
+# Set your GitHub token (needs 'models' scope)
+export GITHUB_TOKEN=ghp_...
 ```
 
 ### Self-Healing Selectors
 
-When a selector breaks (e.g., after a UI refactor), Browsecraft can suggest a replacement:
+When a selector breaks after a UI refactor, Browsecraft can suggest a replacement:
 
-```ts
+```js
 import { healSelector } from 'browsecraft-ai';
 
 const result = await healSelector('#old-submit-btn', pageSnapshot, {
@@ -213,17 +384,16 @@ const result = await healSelector('#old-submit-btn', pageSnapshot, {
 
 if (result.healed) {
   console.log(`Try: ${result.selector} (${result.confidence * 100}% confidence)`);
-  // method: 'ai' | 'text-similarity' | 'attribute-match'
 }
 ```
 
-Works without AI using text similarity and attribute matching. Better with AI.
+Falls back to text similarity and attribute matching when AI is unavailable.
 
 ### Test Generation
 
 Generate test code from natural language:
 
-```ts
+```js
 import { generateTest } from 'browsecraft-ai';
 
 const result = await generateTest({
@@ -232,27 +402,19 @@ const result = await generateTest({
 });
 
 console.log(result.code);
-// import { test, expect } from 'browsecraft';
-// test('user can log in and see the dashboard', async ({ page }) => { ...
 ```
-
-Falls back to a template with TODO comments when Ollama is unavailable.
 
 ### Visual Regression
 
 Compare screenshots pixel-by-pixel with optional AI-powered semantic analysis:
 
-```ts
+```js
 import { compareScreenshots } from 'browsecraft-ai';
 
 const result = await compareScreenshots('baseline.png', 'current.png', {
   threshold: 5,           // per-channel tolerance (0-255)
   maxDiffPercent: 0.1,    // max allowed diff percentage
   diffOutputPath: 'diff.png',
-  antiAlias: true,        // ignore anti-aliasing differences
-  ignoreRegions: [        // skip dynamic regions
-    { x: 0, y: 0, width: 200, height: 50 },
-  ],
 });
 
 if (!result.match) {
@@ -262,41 +424,24 @@ if (!result.match) {
 
 Zero dependencies — parses PNG buffers directly.
 
-## Configuration
-
-Browsecraft works with zero configuration. For customization, use `defineConfig()`:
-
-```ts
-// browsecraft.config.ts
-import { defineConfig } from 'browsecraft';
-
-export default defineConfig({
-  browser: 'chrome',
-  headless: true,
-  timeout: 30_000,
-  retries: 2,
-  testDir: './tests',
-  screenshot: 'on-failure',
-});
-```
-
 ## Architecture
 
-Browsecraft is a monorepo with four packages:
+Browsecraft is a monorepo with five packages:
 
 | Package | Description |
 | --- | --- |
-| `browsecraft` | Main package — Page API, assertions, test runner, CLI |
+| `browsecraft` | Main package — Page API, Browser, config, CLI. Re-exports BDD. |
+| `browsecraft-bdd` | Gherkin parser, step registry, executor, TS-native BDD, hooks, tags |
 | `browsecraft-bidi` | WebDriver BiDi protocol client, browser launcher, CDP bridge |
-| `browsecraft-runner` | Test file discovery, execution, retry logic, colored output |
-| `browsecraft-ai` | AI features — self-healing, test generation, visual diff |
+| `browsecraft-runner` | Test file discovery, execution, retry logic, reporter types |
+| `browsecraft-ai` | AI features — self-healing selectors, test generation, visual diff |
 
 ### BiDi Protocol
 
 Browsecraft uses the W3C WebDriver BiDi protocol to control browsers:
 
+- **Chrome/Edge**: BiDi over CDP (connects to Chrome DevTools Protocol, speaks BiDi)
 - **Firefox**: native BiDi support over WebSocket
-- **Chrome/Edge**: BiDi via `chromium-bidi` mapper (translates BiDi to CDP in-process)
 
 This means Browsecraft controls real, unpatched browser binaries — no special builds, no browser extensions.
 
@@ -304,9 +449,14 @@ This means Browsecraft controls real, unpatched browser binaries — no special 
 
 | Browser | Support | Protocol |
 | --- | --- | --- |
-| Chrome | Full | BiDi via CDP bridge |
-| Edge | Full | BiDi via CDP bridge |
+| Chrome | Full | BiDi over CDP |
+| Edge | Full | BiDi over CDP |
 | Firefox | Full | Native BiDi |
+
+## Requirements
+
+- Node.js >= 20.0.0
+- Chrome, Edge, or Firefox installed
 
 ## License
 

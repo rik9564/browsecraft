@@ -6,3 +6,6 @@ dist/
 .env.*
 coverage/
 .browsecraft/
+
+# Example lock files (they use file: links specific to the monorepo)
+examples/*/package-lock.json
