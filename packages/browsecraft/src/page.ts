@@ -338,9 +338,28 @@ export class Page {
 		const located = await locateElement(this.session, this.contextId, target, { timeout });
 		const ref = this.getSharedRef(located.node);
 
-		// Get element position
-		const pos = await this.getElementCenter(ref);
+		// Scroll into view first so coordinates are accurate
+		await this.session.script.callFunction({
+			functionDeclaration: 'function(el) { el.scrollIntoView({ block: "center", behavior: "instant" }); }',
+			target: { context: this.contextId },
+			arguments: [ref],
+			awaitPromise: false,
+		});
 
+		// Dispatch mouseover/mouseenter events via JS for reliability,
+		// then also move the real pointer for CSS :hover effects
+		await this.session.script.callFunction({
+			functionDeclaration: `function(el) {
+				el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+				el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+			}`,
+			target: { context: this.contextId },
+			arguments: [ref],
+			awaitPromise: false,
+		});
+
+		// Also move the real pointer (needed for CSS :hover pseudo-class)
+		const pos = await this.getElementCenter(ref);
 		await this.session.input.performActions({
 			context: this.contextId,
 			actions: [{
@@ -1170,41 +1189,34 @@ export class Page {
 		);
 	}
 
-	/** Scroll element into view and click it */
+	/**
+	 * Scroll element into view and click it.
+	 *
+	 * Uses JavaScript `.click()` as the primary mechanism because it is
+	 * immune to viewport coordinate mismatches, DPI scaling, layout shifts,
+	 * and Chrome BiDi's unreliable element-origin support. This works
+	 * identically in headless and headed mode, with or without slowMo delays.
+	 *
+	 * The element is scrolled into view first so it's visible in headed mode
+	 * (important when users are watching the test run).
+	 */
 	private async scrollIntoViewAndClick(located: LocatedElement, options?: ClickOptions): Promise<void> {
 		const ref = this.getSharedRef(located.node);
-
-		// Scroll into view
-		await this.session.script.callFunction({
-			functionDeclaration: 'function(el) { el.scrollIntoView({ block: "center", behavior: "instant" }); }',
-			target: { context: this.contextId },
-			arguments: [ref],
-			awaitPromise: false,
-		});
-
-		// Get position and click
-		const pos = await this.getElementCenter(ref);
-
-		const button = options?.button ?? 0;
 		const clickCount = options?.clickCount ?? 1;
 
-		const pointerActions: Array<{ type: string; x?: number; y?: number; button?: number; origin?: string }> = [
-			{ type: 'pointerMove', x: pos.x, y: pos.y, origin: 'viewport' },
-		];
-
-		for (let i = 0; i < clickCount; i++) {
-			pointerActions.push({ type: 'pointerDown', button });
-			pointerActions.push({ type: 'pointerUp', button });
-		}
-
-		await this.session.input.performActions({
-			context: this.contextId,
-			actions: [{
-				type: 'pointer',
-				id: 'mouse',
-				parameters: { pointerType: 'mouse' },
-				actions: pointerActions as any,
-			}],
+		// Scroll element into view so it's visible (especially in headed mode).
+		// Use JS click for reliability — it dispatches the click event directly
+		// on the element regardless of viewport coordinates or layout shifts.
+		await this.session.script.callFunction({
+			functionDeclaration: `function(el, clickCount) {
+				el.scrollIntoView({ block: "center", behavior: "instant" });
+				for (let i = 0; i < clickCount; i++) {
+					el.click();
+				}
+			}`,
+			target: { context: this.contextId },
+			arguments: [ref, { type: 'number', value: clickCount }],
+			awaitPromise: false,
 		});
 	}
 

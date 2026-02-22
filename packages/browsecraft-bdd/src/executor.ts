@@ -138,6 +138,8 @@ export interface ExecutorOptions {
 	failFast?: boolean;
 	/** Whether to run steps after a failure in the same scenario. Default: false (skip remaining) */
 	dryRun?: boolean;
+	/** Slow down step execution by this many milliseconds between steps. Default: 0 */
+	slowMo?: number;
 	/** Custom world factory. Creates the StepWorld for each scenario. */
 	worldFactory?: () => StepWorld | Promise<StepWorld>;
 	/** Called when a step starts */
@@ -502,6 +504,11 @@ export class BddExecutor {
 
 			const result = await this.executeStep(step, world, tags, lastKeywordType);
 			stepResults.push(result);
+
+			// Slow-mo delay between steps (for headed/visual debugging)
+			if (this.options.slowMo && this.options.slowMo > 0 && result.status === 'passed') {
+				await new Promise(r => setTimeout(r, this.options.slowMo));
+			}
 
 			// Update effective keyword type
 			if (step.keywordType === 'Context') lastKeywordType = 'Given';

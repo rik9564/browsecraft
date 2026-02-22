@@ -262,6 +262,20 @@ function buildChromiumArgs(options: BuildArgsOptions): string[] {
 
 	if (options.headless) {
 		args.unshift('--headless=new');
+	} else {
+		// In headed mode, set a sensible window size so the viewport fits properly
+		// and content is aligned. Without this, Chrome may open with a tiny default
+		// window causing elements to render outside the visible area.
+		// Extra pixels account for Chrome's UI chrome (toolbar, tabs, etc.)
+		args.unshift('--window-size=1366,868');
+		// Remove --no-startup-window for headed mode so the window is visible
+	}
+
+	// --no-startup-window is needed for headless; in headed mode it prevents
+	// the window from appearing until a browsing context is created via BiDi
+	if (!options.headless) {
+		const idx = args.indexOf('--no-startup-window');
+		if (idx !== -1) args.splice(idx, 1);
 	}
 
 	if (options.extraArgs) {
