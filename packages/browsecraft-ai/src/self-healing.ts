@@ -3,10 +3,10 @@
 // most likely replacement by analyzing the current page DOM.
 //
 // Works WITHOUT AI: uses Levenshtein distance + attribute similarity.
-// Works BETTER with AI: sends page snapshot to Ollama for intelligent matching.
+// Works BETTER with AI: sends page snapshot to GitHub Models for intelligent matching.
 // ============================================================================
 
-import { ollamaGenerate, isOllamaAvailable } from './ollama.js';
+import { githubModelsGenerate, isGitHubModelsAvailable } from './github-models.js';
 
 /** A snapshot of the page DOM used for healing */
 export interface PageSnapshot {
@@ -84,15 +84,15 @@ export async function healSelector(
 	options: {
 		/** Optional hint about what the element should be */
 		context?: string;
-		/** Try AI healing via Ollama (default true) */
+		/** Try AI healing via GitHub Models (default true) */
 		useAI?: boolean;
-		/** Ollama base URL */
-		ollamaUrl?: string;
+		/** GitHub token for AI features */
+		token?: string;
 		/** Minimum confidence threshold (default 0.3) */
 		minConfidence?: number;
 	} = {},
 ): Promise<HealResult> {
-	const { context, useAI = true, ollamaUrl, minConfidence = 0.3 } = options;
+	const { context, useAI = true, token, minConfidence = 0.3 } = options;
 
 	// 1. Try non-AI heuristics first (fast, always available)
 	const heuristicResult = heuristicHeal(failedSelector, snapshot, context);
@@ -105,13 +105,13 @@ export async function healSelector(
 	// 2. Try AI healing if enabled
 	if (useAI) {
 		try {
-			const available = await isOllamaAvailable(ollamaUrl);
+			const available = await isGitHubModelsAvailable(token);
 			if (available) {
 				const aiResult = await aiHeal(
 					failedSelector,
 					snapshot,
 					context,
-					ollamaUrl,
+					token,
 				);
 				if (aiResult && aiResult.confidence > heuristicResult.confidence) {
 					return aiResult;
@@ -275,14 +275,14 @@ function heuristicHeal(
 }
 
 // ---------------------------------------------------------------------------
-// AI-powered healing via Ollama
+// AI-powered healing via GitHub Models
 // ---------------------------------------------------------------------------
 
 async function aiHeal(
 	failedSelector: string,
 	snapshot: PageSnapshot,
 	context?: string,
-	ollamaUrl?: string,
+	token?: string,
 ): Promise<HealResult | null> {
 	// Build a compact DOM summary (keep it under ~2000 tokens)
 	const elementSummaries = snapshot.elements
@@ -321,8 +321,8 @@ Instructions:
 If no element matches, respond with:
 {"index": -1, "selector": null, "confidence": 0, "reason": "No matching element found"}`;
 
-	const response = await ollamaGenerate(prompt, {
-		baseUrl: ollamaUrl,
+	const response = await githubModelsGenerate(prompt, {
+		token,
 		system:
 			'You are a web testing expert. You analyze DOM structures and CSS selectors. Always respond with valid JSON only.',
 		temperature: 0.1,

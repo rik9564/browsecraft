@@ -1,12 +1,12 @@
 // ============================================================================
 // Test generation — turn natural language descriptions into Browsecraft test
-// code. Uses Ollama for AI generation, with a template-based fallback.
+// code. Uses GitHub Models API for AI generation, with a template-based fallback.
 //
 // Works WITHOUT AI: generates a skeleton test with TODO comments.
 // Works WITH AI: generates complete, runnable test code.
 // ============================================================================
 
-import { ollamaGenerate, isOllamaAvailable, detectCapabilities } from './ollama.js';
+import { githubModelsGenerate, isGitHubModelsAvailable, detectCapabilities } from './github-models.js';
 
 export interface GenerateTestOptions {
 	/** Natural language description of what to test */
@@ -15,9 +15,9 @@ export interface GenerateTestOptions {
 	url?: string;
 	/** Additional context (e.g. page structure, selectors) */
 	context?: string;
-	/** Ollama base URL */
-	ollamaUrl?: string;
-	/** Preferred Ollama model */
+	/** GitHub token for AI features */
+	token?: string;
+	/** Preferred model */
 	model?: string;
 	/** Whether to include assertions (default true) */
 	includeAssertions?: boolean;
@@ -86,7 +86,7 @@ export async function generateTest(
 		description,
 		url,
 		context,
-		ollamaUrl,
+		token,
 		model,
 		includeAssertions = true,
 		style = 'browsecraft',
@@ -94,11 +94,11 @@ export async function generateTest(
 
 	// Try AI generation first
 	try {
-		const available = await isOllamaAvailable(ollamaUrl);
+		const available = await isGitHubModelsAvailable(token);
 		if (available) {
-			const caps = await detectCapabilities(ollamaUrl);
+			const caps = await detectCapabilities(token);
 			const selectedModel =
-				model ?? caps.defaultModel ?? 'llama3.1';
+				model ?? caps.defaultModel;
 
 			const aiResult = await generateWithAI(
 				description,
@@ -106,7 +106,7 @@ export async function generateTest(
 				{
 					url,
 					context,
-					ollamaUrl,
+					token,
 					includeAssertions,
 					style,
 				},
@@ -118,7 +118,7 @@ export async function generateTest(
 					aiGenerated: true,
 					model: selectedModel,
 					notes: [
-						`Generated using ${selectedModel} via Ollama`,
+						`Generated using ${selectedModel} via GitHub Models`,
 						'Review the generated code before running — AI output may need adjustments',
 					],
 				};
@@ -139,15 +139,15 @@ export async function generateTest(
 		code,
 		aiGenerated: false,
 		notes: [
-			'Generated from template (Ollama not available)',
+			'Generated from template (GitHub Models not available)',
 			'Fill in the TODO comments with actual selectors and values',
-			'Install and run Ollama for AI-powered test generation',
+			'Set GITHUB_TOKEN env var for AI-powered test generation',
 		],
 	};
 }
 
 // ---------------------------------------------------------------------------
-// AI generation via Ollama
+// AI generation via GitHub Models
 // ---------------------------------------------------------------------------
 
 async function generateWithAI(
@@ -156,7 +156,7 @@ async function generateWithAI(
 	options: {
 		url?: string;
 		context?: string;
-		ollamaUrl?: string;
+		token?: string;
 		includeAssertions: boolean;
 		style: 'browsecraft' | 'script';
 	},
@@ -183,9 +183,9 @@ Requirements:
 - Keep the test focused and readable.
 - Respond with ONLY the code, no explanations or markdown fences.`;
 
-	const response = await ollamaGenerate(prompt, {
+	const response = await githubModelsGenerate(prompt, {
 		model: modelName,
-		baseUrl: options.ollamaUrl,
+		token: options.token,
 		system:
 			'You are a browser test automation expert. You write clean, readable Browsecraft tests. Output only valid TypeScript code with no markdown formatting.',
 		temperature: 0.2,

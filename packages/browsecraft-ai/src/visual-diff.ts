@@ -2,7 +2,7 @@
 // Visual diff — compare two screenshots pixel-by-pixel.
 //
 // Works WITHOUT AI: pure pixel comparison using raw PNG buffer parsing.
-// Works WITH AI (optional): sends screenshots to a vision model via Ollama
+// Works WITH AI (optional): sends screenshots to GitHub Models GPT-4o vision
 //   for semantic comparison ("these look visually the same despite pixel diffs").
 //
 // Zero external dependencies — parses PNG buffers directly.
@@ -11,6 +11,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createInflate } from 'node:zlib';
+import { githubModelsChat, isGitHubModelsAvailable, type ChatMessage } from './github-models.js';
 
 export interface VisualDiffOptions {
 	/** Allowed pixel difference threshold per channel (0-255, default 5) */
@@ -21,8 +22,8 @@ export interface VisualDiffOptions {
 	diffOutputPath?: string;
 	/** Whether to use AI for semantic comparison (default false) */
 	useAI?: boolean;
-	/** Ollama base URL */
-	ollamaUrl?: string;
+	/** GitHub token for AI vision analysis */
+	token?: string;
 	/** Regions to ignore during comparison: [{x, y, width, height}] */
 	ignoreRegions?: Array<{
 		x: number;
@@ -223,7 +224,97 @@ export async function compareScreenshots(
 		diffImagePath,
 	};
 
+	// AI semantic comparison — if pixel diff failed but AI is requested,
+	// ask GPT-4o vision whether the screenshots are semantically equivalent
+	if (!match && options.useAI) {
+		try {
+			const aiAnalysis = await semanticCompare(
+				baselineBuf,
+				currentBuf,
+				options.token,
+			);
+			if (aiAnalysis) {
+				result.aiAnalysis = aiAnalysis;
+				// If AI says they match semantically, override the pixel result
+				if (aiAnalysis.semanticMatch) {
+					result.match = true;
+				}
+			}
+		} catch {
+			// AI analysis failed, keep pixel result
+		}
+	}
+
 	return result;
+}
+
+// ---------------------------------------------------------------------------
+// AI semantic comparison via GitHub Models GPT-4o vision
+// ---------------------------------------------------------------------------
+
+async function semanticCompare(
+	baselinePng: Buffer,
+	currentPng: Buffer,
+	token?: string,
+): Promise<VisualDiffResult['aiAnalysis'] | null> {
+	const available = await isGitHubModelsAvailable(token);
+	if (!available) return null;
+
+	const baselineB64 = baselinePng.toString('base64');
+	const currentB64 = currentPng.toString('base64');
+
+	const messages: ChatMessage[] = [
+		{
+			role: 'system',
+			content:
+				'You are a visual QA expert. Compare two screenshots and determine if they are semantically equivalent (same content, layout, and meaning) despite any minor pixel-level differences like anti-aliasing, font rendering, or sub-pixel shifts. Respond with ONLY valid JSON.',
+		},
+		{
+			role: 'user',
+			content: [
+				{
+					type: 'text',
+					text: `Compare these two screenshots. The first is the baseline and the second is the current version. Determine if they are semantically equivalent (same content, layout, meaning) despite any pixel-level differences.
+
+Respond with ONLY a JSON object in this exact format:
+{"semanticMatch": true/false, "description": "<brief description of differences or confirmation of match>"}`,
+				},
+				{
+					type: 'image_url',
+					image_url: { url: `data:image/png;base64,${baselineB64}` },
+				},
+				{
+					type: 'image_url',
+					image_url: { url: `data:image/png;base64,${currentB64}` },
+				},
+			],
+		},
+	];
+
+	const response = await githubModelsChat(messages, {
+		model: 'openai/gpt-4o',
+		token,
+		temperature: 0.1,
+		maxTokens: 256,
+	});
+
+	if (!response) return null;
+
+	try {
+		const jsonStr = response.replace(/```json?\s*|\s*```/g, '').trim();
+		const parsed = JSON.parse(jsonStr) as {
+			semanticMatch: boolean;
+			description: string;
+		};
+
+		return {
+			semanticMatch: parsed.semanticMatch,
+			description: parsed.description,
+			model: 'openai/gpt-4o',
+		};
+	} catch {
+		return null;
+	}
 }
 
 // ---------------------------------------------------------------------------

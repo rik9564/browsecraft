@@ -51,6 +51,7 @@
     "self-healing",
     "visual-regression",
     "test-generation",
-    "ollama"
+    "github-models",
+    "github-copilot"
   ]
 }

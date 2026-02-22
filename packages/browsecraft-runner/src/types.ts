@@ -15,7 +15,7 @@ export interface BrowsecraftConfig {
 	workers: number;
 	testMatch: string;
 	outputDir: string;
-	ai: 'auto' | 'off' | { provider: 'ollama'; model?: string; endpoint?: string };
+	ai: 'auto' | 'off' | { provider: 'github-models'; model?: string; token?: string };
 	debug: boolean;
 }
 

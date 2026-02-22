@@ -30,16 +30,18 @@ export interface BrowsecraftConfig {
 	testMatch: string;
 	/** Output directory for reports/screenshots (default: '.browsecraft') */
 	outputDir: string;
-	/** AI mode: 'auto' detects Ollama, 'off' disables (default: 'auto') */
+	/** AI mode: 'auto' detects GitHub Models availability, 'off' disables (default: 'auto') */
 	ai: 'auto' | 'off' | AIConfig;
 	/** Enable verbose debug logging (default: false) */
 	debug: boolean;
 }
 
 export interface AIConfig {
-	provider: 'ollama';
+	provider: 'github-models';
+	/** Model to use (default: 'openai/gpt-4o-mini') */
 	model?: string;
-	endpoint?: string;
+	/** Explicit GitHub token (overrides env vars) */
+	token?: string;
 }
 
 /** Users provide a partial config -- everything has smart defaults */
