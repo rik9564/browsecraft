@@ -1,5 +1,24 @@
 # browsecraft
 
+## 0.3.0
+
+### Minor Changes
+
+- [`27384e8`](https://github.com/rik9564/browsecraft/commit/27384e87ff88f668fff7d7648000a396c408e6d2) Thanks [@rik9564](https://github.com/rik9564)! - Add create-browsecraft scaffolding CLI and update documentation
+
+  - New `create-browsecraft` package: `npm init browsecraft` scaffolds a complete project with zero config
+  - Supports `--bdd`, `--js`, `--quiet` flags and target directory
+  - README: added network interception, actionability, error types, built-in BDD steps, page.go/page.see docs
+  - Architecture updated from 5 to 6 packages
+  - CONTRIBUTING: added create-browsecraft to project structure, updated test count to 102
+
+### Patch Changes
+
+- Updated dependencies []:
+  - browsecraft-bidi@0.3.0
+  - browsecraft-bdd@0.3.0
+  - browsecraft-runner@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
