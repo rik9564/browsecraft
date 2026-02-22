@@ -1,0 +1,13 @@
+{
+	"$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
+	"changelog": ["@changesets/changelog-github", { "repo": "rik9564/browsecraft" }],
+	"commit": false,
+	"fixed": [
+		["browsecraft", "browsecraft-bidi", "browsecraft-ai", "browsecraft-bdd", "browsecraft-runner"]
+	],
+	"linked": [],
+	"access": "public",
+	"baseBranch": "master",
+	"updateInternalDependencies": "patch",
+	"ignore": []
+}

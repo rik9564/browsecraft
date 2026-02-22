@@ -25,10 +25,24 @@
 		"lint:fix": "biome check --write .",
 		"format": "biome format --write .",
 		"typecheck": "turbo run typecheck",
-		"clean": "turbo run clean"
+		"clean": "turbo run clean",
+		"test:smoke": "node tests/smoke.mjs",
+		"test:coverage": "c8 --src packages --include 'packages/*/dist/**' --reporter text --reporter lcov node tests/smoke.mjs",
+		"changeset": "changeset",
+		"version-packages": "changeset version",
+		"release": "pnpm build && changeset publish",
+		"prepare": "husky"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "1.9.4",
+		"@changesets/changelog-github": "^0.5.2",
+		"@changesets/cli": "^2.29.8",
+		"c8": "^10.1.3",
+		"husky": "^9.1.7",
+		"lint-staged": "^16.2.7",
 		"turbo": "^2.8.10"
+	},
+	"lint-staged": {
+		"*.{ts,js,mjs,json}": "biome check --write --no-errors-on-unmatched"
 	}
 }

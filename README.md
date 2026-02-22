@@ -1,5 +1,9 @@
 # Browsecraft
 
+[![CI](https://github.com/rik9564/browsecraft/actions/workflows/ci.yml/badge.svg)](https://github.com/rik9564/browsecraft/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/browsecraft)](https://www.npmjs.com/package/browsecraft)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Browser automation that just works.
 
 ```js
