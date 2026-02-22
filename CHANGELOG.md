@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-02-23
+
+### Added
+- CI workflow: build + typecheck on every push/PR to master
+- Tag-based publish workflow with npm provenance and auto GitHub Releases
+- CHANGELOG.md following Keep a Changelog format
+
+### Changed
+- Publish workflow now triggers only on `v*` tags instead of every push to master
+
 ## [0.1.1] - 2026-02-22
 
 ### Added
@@ -39,5 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publishing infrastructure (LICENSE, .npmignore, publishConfig for all packages)
 - Example projects (getting-started, bdd-gherkin, bdd-typescript)
 
+[0.1.2]: https://github.com/rik9564/browsecraft/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/rik9564/browsecraft/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/rik9564/browsecraft/releases/tag/v0.1.0
