@@ -2,11 +2,41 @@ name: Publish to npm
 
 on:
   push:
-    branches: [master]
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
 
 jobs:
-  publish:
+  ci:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm turbo run build
+
+      - name: Typecheck all packages
+        run: pnpm turbo run typecheck
+
+  publish:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -41,7 +71,7 @@ jobs:
             if [ "$LOCAL_VERSION" != "$REMOTE_VERSION" ]; then
               echo "Publishing $NAME@$LOCAL_VERSION (remote: $REMOTE_VERSION)"
               cd "$pkg"
-              pnpm publish --access public --no-git-checks
+              pnpm publish --access public --no-git-checks --provenance
               cd "$GITHUB_WORKSPACE"
             else
               echo "Skipping $NAME@$LOCAL_VERSION (already published)"
@@ -49,3 +79,46 @@ jobs:
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          # Get the previous tag
+          PREV_TAG=$(git tag --sort=-v:refname | grep -A1 "^${TAG}$" | tail -1)
+          if [ "$PREV_TAG" = "$TAG" ] || [ -z "$PREV_TAG" ]; then
+            # First release — use all commits
+            COMMITS=$(git log --pretty=format:"- %s (%h)" HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" "${PREV_TAG}..${TAG}")
+          fi
+          {
+            echo "NOTES<<EOF"
+            echo "## What's Changed"
+            echo ""
+            echo "$COMMITS"
+            echo ""
+            echo "## Packages"
+            echo ""
+            echo "| Package | Version |"
+            echo "|---------|---------|"
+            echo "| [browsecraft](https://www.npmjs.com/package/browsecraft) | ${{ steps.version.outputs.VERSION }} |"
+            echo "| [browsecraft-bidi](https://www.npmjs.com/package/browsecraft-bidi) | ${{ steps.version.outputs.VERSION }} |"
+            echo "| [browsecraft-ai](https://www.npmjs.com/package/browsecraft-ai) | ${{ steps.version.outputs.VERSION }} |"
+            echo "| [browsecraft-bdd](https://www.npmjs.com/package/browsecraft-bdd) | ${{ steps.version.outputs.VERSION }} |"
+            echo "| [browsecraft-runner](https://www.npmjs.com/package/browsecraft-runner) | ${{ steps.version.outputs.VERSION }} |"
+            echo ""
+            echo "Install: \`npm install browsecraft@${{ steps.version.outputs.VERSION }}\`"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ steps.version.outputs.VERSION }}
+          body: ${{ steps.notes.outputs.NOTES }}
+          generate_release_notes: false
