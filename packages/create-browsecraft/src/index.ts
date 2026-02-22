@@ -250,7 +250,7 @@ function featureFileTemplate(): string {
   Scenario: Page loads with correct title
     Given I am on "https://example.com"
     Then I should see "Example Domain"
-    And the page title should be "Example Domain"
+    And the title should be "Example Domain"
 
   Scenario: Navigate to more information
     Given I am on "https://example.com"
@@ -269,7 +269,7 @@ function stepDefinitionsTemplate(ts: boolean): string {
 //   When I click {string}
 //   When I type {string} into {string}
 //   Then I should see {string}
-//   Then the page title should be {string}
+//   Then the title should be {string}
 //   Then the URL should contain {string}
 //   ...and many more
 registerBuiltInSteps();

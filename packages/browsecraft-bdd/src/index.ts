@@ -103,12 +103,19 @@ export {
 // ---------------------------------------------------------------------------
 // TypeScript-Native BDD (Mode 2)
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// TypeScript-Native BDD (Mode 2)
+// NOTE: `then` is renamed to `thenStep` in the re-export to avoid Node.js
+// treating this module as a thenable (modules with a `then` export cause
+// dynamic import() to call `then()` as if it were a Promise).
+// The internal function remains named `then` in ts-bdd.ts.
+// ---------------------------------------------------------------------------
 export {
 	feature,
 	scenario,
 	given,
 	when,
-	then,
+	then as thenStep,
 	and,
 	but,
 	beforeEach,

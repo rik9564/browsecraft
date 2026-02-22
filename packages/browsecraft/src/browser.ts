@@ -119,7 +119,9 @@ export class Browser {
 		};
 
 		const session = await BiDiSession.launch(sessionOptions);
-		return new Browser(session, config);
+		const browser = new Browser(session, config);
+
+		return browser;
 	}
 
 	/**
@@ -137,6 +139,9 @@ export class Browser {
 
 	/**
 	 * Create a new page (tab).
+	 * If an idle about:blank tab exists (e.g., Chrome's initial tab), it is
+	 * reused instead of creating a new one. This prevents the "double window"
+	 * issue in headed mode.
 	 *
 	 * ```ts
 	 * const page = await browser.newPage();
@@ -144,8 +149,16 @@ export class Browser {
 	 * ```
 	 */
 	async newPage(): Promise<Page> {
-		const result = await this.session.browsingContext.create({ type: 'tab' });
-		const contextId = result.context;
+		let contextId: string;
+
+		// Try to reuse the initial about:blank tab to avoid double windows in headed mode
+		const reused = await this.tryReuseInitialTab();
+		if (reused) {
+			contextId = reused;
+		} else {
+			const result = await this.session.browsingContext.create({ type: 'tab' });
+			contextId = result.context;
+		}
 
 		await applyViewport(this.session, contextId, this.config);
 
@@ -203,6 +216,28 @@ export class Browser {
 	/** Get the resolved config */
 	getConfig(): BrowsecraftConfig {
 		return { ...this.config };
+	}
+
+	/**
+	 * Try to find and reuse an existing about:blank tab (Chrome opens one on startup).
+	 * Returns the context ID if found, or null if no idle tab exists.
+	 * @internal
+	 */
+	private async tryReuseInitialTab(): Promise<string | null> {
+		try {
+			const tree = await this.session.browsingContext.getTree();
+			const contexts = tree.contexts ?? [];
+			for (const ctx of contexts) {
+				// Only reuse tabs we haven't already wrapped as a Page
+				const alreadyTracked = this.pages.some((p) => (p as any).contextId === ctx.context);
+				if (!alreadyTracked && ctx.url === 'about:blank') {
+					return ctx.context;
+				}
+			}
+		} catch {
+			// getTree not supported — fall through to create
+		}
+		return null;
 	}
 }
 

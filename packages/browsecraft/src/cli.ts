@@ -9,8 +9,8 @@
 // npx browsecraft --help            # Show help
 // ============================================================================
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { type RunnableTest, type RunnerOptions, TestRunner } from 'browsecraft-runner';
 import { Browser } from './browser.js';
@@ -86,6 +86,12 @@ async function runTests(args: string[]) {
 		config.debug = true;
 	}
 
+	// BDD mode: run .feature files with step definitions
+	if (flags.bdd) {
+		await runBddTests(config, userConfig);
+		return;
+	}
+
 	// Set up runner options
 	const runnerOptions: RunnerOptions = {
 		config,
@@ -147,6 +153,213 @@ async function runTests(args: string[]) {
 		await sharedBrowser?.close().catch(() => {});
 		throw err;
 	}
+}
+
+// ---------------------------------------------------------------------------
+// BDD Command — runs .feature files with step definitions
+// ---------------------------------------------------------------------------
+
+async function runBddTests(
+	config: ReturnType<typeof resolveConfig>,
+	userConfig?: UserConfig,
+): Promise<void> {
+	const bddModule = (await import('browsecraft-bdd')) as typeof import('browsecraft-bdd');
+	const { parseGherkin, BddExecutor, registerBuiltInSteps } = bddModule;
+	const cwd = process.cwd();
+
+	// Resolve BDD config from user config
+	const bddConfig = userConfig?.bdd ?? {};
+	const featuresPattern = bddConfig.features ?? 'features/**/*.feature';
+	const stepsPattern = bddConfig.steps ?? 'steps/**/*.{ts,js,mts,mjs}';
+	const useBuiltInSteps = bddConfig.builtInSteps !== false; // default true
+
+	// Step 1: Discover .feature files
+	const featureFiles = discoverFiles(cwd, featuresPattern, ['.feature']);
+	if (featureFiles.length === 0) {
+		console.log('\n  No .feature files found.\n');
+		console.log(`  Feature pattern: ${featuresPattern}`);
+		console.log('  Create features/*.feature files or adjust bdd.features in your config.\n');
+		process.exit(0);
+	}
+
+	// Step 2: Register built-in steps if enabled
+	if (useBuiltInSteps) {
+		registerBuiltInSteps();
+	}
+
+	// Step 3: Load step definition files
+	const stepFiles = discoverFiles(cwd, stepsPattern, ['.ts', '.js', '.mts', '.mjs']);
+	for (const stepFile of stepFiles) {
+		if (stepFile.endsWith('.ts') || stepFile.endsWith('.mts')) {
+			await ensureTypeScriptLoader();
+		}
+		const fileUrl = pathToFileURL(stepFile).href;
+		await import(fileUrl);
+	}
+
+	// Step 4: Parse .feature files into GherkinDocuments
+	const documents = featureFiles.map((file) => {
+		const source = readFileSync(file, 'utf-8');
+		return parseGherkin(source, relative(cwd, file));
+	});
+
+	// Step 5: Launch browser
+	let browser: Browser;
+	try {
+		browser = await Browser.launch({
+			browser: config.browser,
+			headless: config.headless,
+			executablePath: config.executablePath,
+			debug: config.debug,
+			timeout: config.timeout,
+		});
+	} catch (err) {
+		console.error(`Failed to launch browser: ${err instanceof Error ? err.message : String(err)}`);
+		process.exit(1);
+	}
+
+	// Step 6: Create executor with a worldFactory that provides page + browser
+	const executor = new BddExecutor({
+		stepTimeout: config.timeout,
+		worldFactory: async () => {
+			const context = await browser.newContext();
+			const page = await context.newPage();
+			return {
+				page,
+				browser,
+				ctx: {},
+				attach: () => {},
+				log: (msg: string) => console.log(`      ${msg}`),
+				// Store context for cleanup
+				_context: context,
+			};
+		},
+		onFeatureStart: (feature) => {
+			console.log(`\n  Feature: ${feature.name}`);
+		},
+		onScenarioStart: (scenario) => {
+			console.log(`    Scenario: ${scenario.name}`);
+		},
+		onStepEnd: (result) => {
+			const icon =
+				result.status === 'passed'
+					? '\x1b[32m+\x1b[0m'
+					: result.status === 'failed'
+						? '\x1b[31mx\x1b[0m'
+						: result.status === 'undefined'
+							? '\x1b[33m?\x1b[0m'
+							: result.status === 'pending'
+								? '\x1b[33m-\x1b[0m'
+								: '\x1b[90m-\x1b[0m';
+			console.log(`      ${icon} ${result.keyword.trim()} ${result.text} (${result.duration}ms)`);
+			if (result.status === 'failed' && result.error) {
+				console.log(`        ${result.error.message}`);
+			}
+			if (result.status === 'undefined') {
+				console.log('        Step not defined. Add it to your step definitions.');
+			}
+		},
+		onScenarioEnd: async (result) => {
+			// Clean up browser context after each scenario
+			const world = result as any;
+			// Context cleanup is handled by the afterScenario hook below
+		},
+	});
+
+	// Step 7: Run features
+	console.log(
+		`\n  Browsecraft BDD - Running ${featureFiles.length} feature file${featureFiles.length > 1 ? 's' : ''}\n`,
+	);
+
+	try {
+		const result = await executor.run(documents);
+
+		// Print summary
+		console.log('\n  ─────────────────────────────────────');
+		const { scenarios, steps } = result.summary;
+
+		const scenarioParts: string[] = [];
+		if (scenarios.passed > 0) scenarioParts.push(`\x1b[32m${scenarios.passed} passed\x1b[0m`);
+		if (scenarios.failed > 0) scenarioParts.push(`\x1b[31m${scenarios.failed} failed\x1b[0m`);
+		if (scenarios.skipped > 0) scenarioParts.push(`\x1b[33m${scenarios.skipped} skipped\x1b[0m`);
+		if (scenarios.pending > 0) scenarioParts.push(`\x1b[33m${scenarios.pending} pending\x1b[0m`);
+
+		const stepParts: string[] = [];
+		if (steps.passed > 0) stepParts.push(`\x1b[32m${steps.passed} passed\x1b[0m`);
+		if (steps.failed > 0) stepParts.push(`\x1b[31m${steps.failed} failed\x1b[0m`);
+		if (steps.undefined > 0) stepParts.push(`\x1b[33m${steps.undefined} undefined\x1b[0m`);
+		if (steps.skipped > 0) stepParts.push(`\x1b[90m${steps.skipped} skipped\x1b[0m`);
+
+		console.log(`  Scenarios: ${scenarioParts.join(', ')} (${scenarios.total} total)`);
+		console.log(`  Steps:     ${stepParts.join(', ')} (${steps.total} total)`);
+		console.log(
+			`  Time:      ${result.duration < 1000 ? `${result.duration}ms` : `${(result.duration / 1000).toFixed(1)}s`}`,
+		);
+		console.log('');
+
+		if (scenarios.failed > 0) {
+			console.log('  \x1b[31mSome scenarios failed.\x1b[0m\n');
+		} else if (steps.undefined > 0) {
+			console.log('  \x1b[33mSome steps are undefined.\x1b[0m\n');
+		} else {
+			console.log('  \x1b[32mAll scenarios passed!\x1b[0m\n');
+		}
+
+		await browser.close().catch(() => {});
+		process.exit(scenarios.failed > 0 || steps.undefined > 0 ? 1 : 0);
+	} catch (err) {
+		await browser.close().catch(() => {});
+		console.error(`BDD execution error: ${err instanceof Error ? err.message : String(err)}`);
+		process.exit(1);
+	}
+}
+
+/**
+ * Discover files matching a glob-like pattern within a directory.
+ * Supports patterns like 'features/**\/*.feature' or 'steps/**\/*.{ts,js}'.
+ */
+function discoverFiles(rootDir: string, pattern: string, extensions: string[]): string[] {
+	const files: string[] = [];
+
+	// Extract the base directory from the pattern (e.g., 'features' from 'features/**/*.feature')
+	const baseParts = pattern.split('/');
+	let baseDir = rootDir;
+	for (const part of baseParts) {
+		if (part.includes('*') || part.includes('{')) break;
+		baseDir = join(baseDir, part);
+	}
+
+	if (!existsSync(baseDir)) return files;
+
+	const walkDir = (dir: string): void => {
+		const skip = new Set(['node_modules', 'dist', '.browsecraft', '.git', 'coverage', '.turbo']);
+		let entries: string[];
+		try {
+			entries = readdirSync(dir);
+		} catch {
+			return;
+		}
+		for (const entry of entries) {
+			if (skip.has(entry)) continue;
+			const fullPath = join(dir, entry);
+			let stat: ReturnType<typeof statSync>;
+			try {
+				stat = statSync(fullPath);
+			} catch {
+				continue;
+			}
+			if (stat.isDirectory()) {
+				walkDir(fullPath);
+			} else if (stat.isFile()) {
+				if (extensions.some((ext) => entry.endsWith(ext))) {
+					files.push(fullPath);
+				}
+			}
+		}
+	};
+
+	walkDir(baseDir);
+	return files.sort();
 }
 
 // ---------------------------------------------------------------------------
@@ -354,6 +567,7 @@ interface CLIFlags {
 	grep?: string;
 	bail?: boolean;
 	debug?: boolean;
+	bdd?: boolean;
 }
 
 function parseFlags(args: string[]): CLIFlags {
@@ -370,6 +584,9 @@ function parseFlags(args: string[]): CLIFlags {
 				break;
 			case '--debug':
 				flags.debug = true;
+				break;
+			case '--bdd':
+				flags.bdd = true;
 				break;
 			case '--bail':
 				flags.bail = true;
@@ -406,13 +623,16 @@ function printHelp() {
 
   Usage:
     browsecraft test [files...] [options]
+    browsecraft test --bdd [options]
     browsecraft init
 
   Commands:
     test          Run browser tests
+    test --bdd    Run BDD feature files (Gherkin)
     init          Create a new project with example config and test
 
   Options:
+    --bdd               Run BDD feature files instead of programmatic tests
     --browser <name>    Browser to use: chrome, firefox, edge (default: chrome)
     --headed            Run in headed mode (show the browser)
     --headless          Run in headless mode (default)
@@ -430,6 +650,8 @@ function printHelp() {
     browsecraft test tests/login.test.ts      # Run specific file
     browsecraft test --headed --browser firefox
     browsecraft test --grep "login" --bail
+    browsecraft test --bdd                       # Run all .feature files
+    browsecraft test --bdd --headed              # Run BDD in headed mode
 `);
 }
 

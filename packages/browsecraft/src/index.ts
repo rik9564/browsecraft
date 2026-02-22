@@ -31,7 +31,7 @@ export { expect, AssertionError } from './expect.js';
 
 // Configuration
 export { defineConfig, resolveConfig } from './config.js';
-export type { BrowsecraftConfig, UserConfig, AIConfig } from './config.js';
+export type { BrowsecraftConfig, UserConfig, AIConfig, BddConfig } from './config.js';
 
 // Browser & Page (for advanced usage / scripting)
 export { Browser, BrowserContext } from './browser.js';
@@ -111,12 +111,15 @@ export {
 export { parseTagExpression, matchesTags } from 'browsecraft-bdd';
 
 // TypeScript-native BDD (Mode 2)
+// NOTE: `then` is renamed to `thenStep` to avoid Node.js treating this module
+// as a thenable (modules with a `then` export cause dynamic import() to call
+// `then()` as if it were a Promise).
 export {
 	feature,
 	scenario,
 	given,
 	when,
-	then,
+	thenStep,
 	and,
 	but,
 	runFeatures,

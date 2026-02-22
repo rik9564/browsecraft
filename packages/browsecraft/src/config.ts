@@ -36,6 +36,18 @@ export interface BrowsecraftConfig {
 	ai: 'auto' | 'off' | AIConfig;
 	/** Enable verbose debug logging (default: false) */
 	debug: boolean;
+	/** BDD configuration for Gherkin feature files */
+	bdd?: BddConfig;
+}
+
+/** Configuration for BDD (Gherkin) test execution */
+export interface BddConfig {
+	// Glob pattern for feature files (default: 'features/**\/*.feature')
+	features?: string;
+	// Glob pattern for step definition files (default: 'steps/**\/*.{ts,js,mts,mjs}')
+	steps?: string;
+	/** Whether to register the 38 built-in step definitions (default: true) */
+	builtInSteps?: boolean;
 }
 
 export interface AIConfig {
