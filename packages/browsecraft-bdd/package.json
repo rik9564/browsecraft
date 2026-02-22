@@ -40,12 +40,12 @@
   "author": "Browsecraft Contributors",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AchilleasCH/browsecraft.git",
+    "url": "https://github.com/rik9564/browsecraft.git",
     "directory": "packages/browsecraft-bdd"
   },
-  "homepage": "https://github.com/AchilleasCH/browsecraft#readme",
+  "homepage": "https://github.com/rik9564/browsecraft#readme",
   "bugs": {
-    "url": "https://github.com/AchilleasCH/browsecraft/issues"
+    "url": "https://github.com/rik9564/browsecraft/issues"
   },
   "engines": {
     "node": ">=20.0.0"
