@@ -3,7 +3,14 @@
 	"changelog": ["@changesets/changelog-github", { "repo": "rik9564/browsecraft" }],
 	"commit": false,
 	"fixed": [
-		["browsecraft", "browsecraft-bidi", "browsecraft-ai", "browsecraft-bdd", "browsecraft-runner"]
+		[
+			"browsecraft",
+			"browsecraft-bidi",
+			"browsecraft-ai",
+			"browsecraft-bdd",
+			"browsecraft-runner",
+			"create-browsecraft"
+		]
 	],
 	"linked": [],
 	"access": "public",

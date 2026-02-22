@@ -1,0 +1,51 @@
+{
+	"name": "create-browsecraft",
+	"version": "0.2.0",
+	"description": "Create a new Browsecraft project with zero configuration",
+	"type": "module",
+	"main": "./dist/index.js",
+	"bin": {
+		"create-browsecraft": "./dist/index.js"
+	},
+	"files": ["dist", "LICENSE"],
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"typecheck": "tsc --noEmit",
+		"clean": "rimraf dist"
+	},
+	"sideEffects": false,
+	"publishConfig": {
+		"access": "public"
+	},
+	"devDependencies": {
+		"@types/node": "^25.3.0",
+		"tsup": "^8.3.5",
+		"typescript": "^5.7.2",
+		"rimraf": "^6.0.1"
+	},
+	"license": "MIT",
+	"author": "Browsecraft Contributors",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/rik9564/browsecraft.git",
+		"directory": "packages/create-browsecraft"
+	},
+	"homepage": "https://github.com/rik9564/browsecraft#readme",
+	"bugs": {
+		"url": "https://github.com/rik9564/browsecraft/issues"
+	},
+	"engines": {
+		"node": ">=20.0.0"
+	},
+	"keywords": [
+		"browsecraft",
+		"create",
+		"scaffold",
+		"init",
+		"browser-testing",
+		"e2e",
+		"bdd",
+		"automation"
+	]
+}

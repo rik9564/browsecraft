@@ -17,7 +17,7 @@ import { Browser } from './browser.js';
 import { type UserConfig, resolveConfig } from './config.js';
 import { type TestCase, runAfterAllHooks, runTest, testRegistry } from './test.js';
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
 async function main() {
 	const args = process.argv.slice(2);
