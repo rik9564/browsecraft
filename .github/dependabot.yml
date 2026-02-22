@@ -13,3 +13,6 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "chore"
+    ignore:
+      - dependency-name: "@biomejs/biome"
+        update-types: ["version-update:semver-major"]
