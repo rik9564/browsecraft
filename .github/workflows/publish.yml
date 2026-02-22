@@ -1,0 +1,53 @@
+name: Publish to npm
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm turbo run build
+
+      - name: Publish packages (skip if version already exists)
+        run: |
+          PACKAGES=(
+            "packages/browsecraft-bidi"
+            "packages/browsecraft-ai"
+            "packages/browsecraft-runner"
+            "packages/browsecraft-bdd"
+            "packages/browsecraft"
+          )
+
+          for pkg in "${PACKAGES[@]}"; do
+            NAME=$(node -p "require('./$pkg/package.json').name")
+            LOCAL_VERSION=$(node -p "require('./$pkg/package.json').version")
+            REMOTE_VERSION=$(npm view "$NAME" version 2>/dev/null || echo "0.0.0")
+
+            if [ "$LOCAL_VERSION" != "$REMOTE_VERSION" ]; then
+              echo "Publishing $NAME@$LOCAL_VERSION (remote: $REMOTE_VERSION)"
+              cd "$pkg"
+              pnpm publish --access public --no-git-checks
+              cd "$GITHUB_WORKSPACE"
+            else
+              echo "Skipping $NAME@$LOCAL_VERSION (already published)"
+            fi
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
