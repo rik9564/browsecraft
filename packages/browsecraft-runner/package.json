@@ -1,6 +1,6 @@
 {
   "name": "browsecraft-runner",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Test runner and CLI for Browsecraft",
   "type": "module",
   "main": "./dist/index.cjs",
