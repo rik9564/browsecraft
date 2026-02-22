@@ -107,12 +107,7 @@ export async function healSelector(
 		try {
 			const available = await isGitHubModelsAvailable(token);
 			if (available) {
-				const aiResult = await aiHeal(
-					failedSelector,
-					snapshot,
-					context,
-					token,
-				);
+				const aiResult = await aiHeal(failedSelector, snapshot, context, token);
 				if (aiResult && aiResult.confidence > heuristicResult.confidence) {
 					return aiResult;
 				}
@@ -167,9 +162,7 @@ function heuristicHeal(
 			const overlap = setOverlap(parsed.classes, el.classes);
 			if (overlap > 0) {
 				score += overlap * 0.2;
-				reasons.push(
-					`Class overlap: ${(overlap * 100).toFixed(0)}%`,
-				);
+				reasons.push(`Class overlap: ${(overlap * 100).toFixed(0)}%`);
 			}
 		}
 
@@ -181,29 +174,17 @@ function heuristicHeal(
 
 		// Text similarity (for text-based selectors)
 		if (parsed.text && el.text) {
-			const sim = stringSimilarity(
-				parsed.text.toLowerCase(),
-				el.text.toLowerCase(),
-			);
+			const sim = stringSimilarity(parsed.text.toLowerCase(), el.text.toLowerCase());
 			if (sim > 0.4) {
 				score += sim * 0.35;
-				reasons.push(
-					`Text similar: "${el.text.slice(0, 50)}" (${(sim * 100).toFixed(0)}%)`,
-				);
+				reasons.push(`Text similar: "${el.text.slice(0, 50)}" (${(sim * 100).toFixed(0)}%)`);
 			}
 		}
 
 		// Context matching — if the caller told us what the element is
 		if (context) {
 			const contextLower = context.toLowerCase();
-			const combined = [
-				el.text,
-				el.ariaLabel,
-				el.placeholder,
-				el.id,
-				el.name,
-				el.role,
-			]
+			const combined = [el.text, el.ariaLabel, el.placeholder, el.id, el.name, el.role]
 				.filter(Boolean)
 				.join(' ')
 				.toLowerCase();
@@ -211,9 +192,7 @@ function heuristicHeal(
 			const sim = stringSimilarity(contextLower, combined);
 			if (sim > 0.3) {
 				score += sim * 0.25;
-				reasons.push(
-					`Context match: "${context}" (${(sim * 100).toFixed(0)}%)`,
-				);
+				reasons.push(`Context match: "${context}" (${(sim * 100).toFixed(0)}%)`);
 			}
 		}
 
@@ -255,10 +234,7 @@ function heuristicHeal(
 			healed: true,
 			selector: best.selector,
 			confidence: best.confidence,
-			method:
-				best.reason.includes('Text similar')
-					? 'text-similarity'
-					: 'attribute-match',
+			method: best.reason.includes('Text similar') ? 'text-similarity' : 'attribute-match',
 			explanation: `Found likely replacement: ${best.reason}`,
 			candidates: candidates.slice(0, 5),
 		};
@@ -341,11 +317,7 @@ If no element matches, respond with:
 			reason: string;
 		};
 
-		if (
-			parsed.index < 0 ||
-			!parsed.selector ||
-			parsed.confidence < 0.2
-		) {
+		if (parsed.index < 0 || !parsed.selector || parsed.confidence < 0.2) {
 			return null;
 		}
 
@@ -402,9 +374,7 @@ function parseSelector(selector: string): ParsedSelector {
 	}
 
 	// Extract data-testid
-	const testIdMatch = selector.match(
-		/\[data-testid=["']?([\w-]+)["']?\]/,
-	);
+	const testIdMatch = selector.match(/\[data-testid=["']?([\w-]+)["']?\]/);
 	if (testIdMatch) result.testId = testIdMatch[1];
 
 	// Extract name attribute

@@ -181,19 +181,13 @@ export interface BrowsingContextTraverseHistoryParams {
 	delta: number;
 }
 
-export interface BrowsingContextTraverseHistoryResult {
-	// Empty result on success
-}
+export type BrowsingContextTraverseHistoryResult = {};
 
 // ---------------------------------------------------------------------------
 // Locator types - how BiDi finds elements
 // ---------------------------------------------------------------------------
 
-export type Locator =
-	| CssLocator
-	| XPathLocator
-	| InnerTextLocator
-	| AccessibilityLocator;
+export type Locator = CssLocator | XPathLocator | InnerTextLocator | AccessibilityLocator;
 
 export interface CssLocator {
 	type: 'css';
@@ -307,10 +301,7 @@ export interface SharedReference {
 	handle?: string;
 }
 
-export type RemoteValue =
-	| PrimitiveRemoteValue
-	| NodeRemoteValue
-	| ObjectRemoteValue;
+export type RemoteValue = PrimitiveRemoteValue | NodeRemoteValue | ObjectRemoteValue;
 
 export type PrimitiveRemoteValue =
 	| { type: 'undefined' }
@@ -354,10 +345,7 @@ export interface NetworkAddInterceptParams {
 	contexts?: string[];
 }
 
-export type NetworkInterceptPhase =
-	| 'beforeRequestSent'
-	| 'responseStarted'
-	| 'authRequired';
+export type NetworkInterceptPhase = 'beforeRequestSent' | 'responseStarted' | 'authRequired';
 
 export type UrlPattern = UrlPatternString | UrlPatternPattern;
 

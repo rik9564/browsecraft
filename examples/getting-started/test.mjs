@@ -196,9 +196,7 @@ async function main() {
 			assert(screenshot.length > 1000, 'Expected screenshot to be > 1KB');
 
 			// Evaluate JavaScript in the browser
-			const inputCount = await page.evaluate(
-				'document.querySelectorAll("input").length'
-			);
+			const inputCount = await page.evaluate('document.querySelectorAll("input").length');
 			assert(inputCount >= 2, `Expected at least 2 inputs, got ${inputCount}`);
 
 			await page.close();
@@ -245,7 +243,9 @@ async function main() {
 
 	// Summary
 	console.log(`\n${BOLD}────────────────────────────────${RESET}`);
-	console.log(`  ${GREEN}${passed} passed${RESET}, ${failed > 0 ? RED : DIM}${failed} failed${RESET}`);
+	console.log(
+		`  ${GREEN}${passed} passed${RESET}, ${failed > 0 ? RED : DIM}${failed} failed${RESET}`,
+	);
 	console.log(`${BOLD}────────────────────────────────${RESET}\n`);
 
 	process.exit(failed > 0 ? 1 : 0);

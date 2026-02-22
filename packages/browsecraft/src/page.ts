@@ -9,15 +9,20 @@
 
 import type {
 	BiDiSession,
-	NodeRemoteValue,
-	SharedReference,
-	ScriptEvaluateResult,
-	StorageCookie,
 	NetworkSetCookieHeader,
+	NodeRemoteValue,
+	ScriptEvaluateResult,
+	SharedReference,
+	StorageCookie,
 } from 'browsecraft-bidi';
-import { locateElement, locateAllElements, type ElementTarget, type LocatedElement } from './locator.js';
-import { waitFor, waitForLoadState, type WaitOptions } from './wait.js';
 import type { BrowsecraftConfig } from './config.js';
+import {
+	type ElementTarget,
+	type LocatedElement,
+	locateAllElements,
+	locateElement,
+} from './locator.js';
+import { type WaitOptions, waitFor, waitForLoadState } from './wait.js';
 
 /** Options for page.goto() */
 export interface GotoOptions {
@@ -166,9 +171,8 @@ export class Page {
 		const timeout = options?.timeout ?? this.config.timeout;
 
 		// For string targets, treat as label/placeholder for inputs
-		const resolvedTarget: ElementTarget = typeof target === 'string'
-			? { label: target, name: target }
-			: target;
+		const resolvedTarget: ElementTarget =
+			typeof target === 'string' ? { label: target, name: target } : target;
 
 		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
 
@@ -211,9 +215,8 @@ export class Page {
 	async type(target: ElementTarget, text: string, options?: FillOptions): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
 
-		const resolvedTarget: ElementTarget = typeof target === 'string'
-			? { label: target, name: target }
-			: target;
+		const resolvedTarget: ElementTarget =
+			typeof target === 'string' ? { label: target, name: target } : target;
 
 		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
 
@@ -248,9 +251,8 @@ export class Page {
 	 */
 	async select(target: ElementTarget, value: string, options?: FillOptions): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const resolvedTarget: ElementTarget = typeof target === 'string'
-			? { label: target, name: target }
-			: target;
+		const resolvedTarget: ElementTarget =
+			typeof target === 'string' ? { label: target, name: target } : target;
 
 		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
 		const ref = this.getSharedRef(located.node);
@@ -292,7 +294,8 @@ export class Page {
 			awaitPromise: false,
 		});
 
-		const isChecked = result.type === 'success' &&
+		const isChecked =
+			result.type === 'success' &&
 			result.result?.type === 'boolean' &&
 			(result.result as { value: boolean }).value === true;
 
@@ -316,7 +319,8 @@ export class Page {
 			awaitPromise: false,
 		});
 
-		const isChecked = result.type === 'success' &&
+		const isChecked =
+			result.type === 'success' &&
 			result.result?.type === 'boolean' &&
 			(result.result as { value: boolean }).value === true;
 
@@ -339,7 +343,8 @@ export class Page {
 
 		// Scroll into view first so coordinates are accurate
 		await this.session.script.callFunction({
-			functionDeclaration: 'function(el) { el.scrollIntoView({ block: "center", behavior: "instant" }); }',
+			functionDeclaration:
+				'function(el) { el.scrollIntoView({ block: "center", behavior: "instant" }); }',
 			target: { context: this.contextId },
 			arguments: [ref],
 			awaitPromise: false,
@@ -361,14 +366,14 @@ export class Page {
 		const pos = await this.getElementCenter(ref);
 		await this.session.input.performActions({
 			context: this.contextId,
-			actions: [{
-				type: 'pointer',
-				id: 'mouse',
-				parameters: { pointerType: 'mouse' },
-				actions: [
-					{ type: 'pointerMove', x: pos.x, y: pos.y, origin: 'viewport' },
-				],
-			}],
+			actions: [
+				{
+					type: 'pointer',
+					id: 'mouse',
+					parameters: { pointerType: 'mouse' },
+					actions: [{ type: 'pointerMove', x: pos.x, y: pos.y, origin: 'viewport' }],
+				},
+			],
 		});
 	}
 
@@ -478,13 +483,17 @@ export class Page {
 	 * const session = cookies.find(c => c.name === 'session_id');
 	 * ```
 	 */
-	async cookies(filter?: { name?: string; domain?: string; path?: string }): Promise<StorageCookie[]> {
+	async cookies(filter?: { name?: string; domain?: string; path?: string }): Promise<
+		StorageCookie[]
+	> {
 		const result = await this.session.storage.getCookies({
-			filter: filter ? {
-				name: filter.name,
-				domain: filter.domain,
-				path: filter.path,
-			} : undefined,
+			filter: filter
+				? {
+						name: filter.name,
+						domain: filter.domain,
+						path: filter.path,
+					}
+				: undefined,
 			partition: { type: 'context', context: this.contextId },
 		});
 		return result.cookies;
@@ -500,7 +509,18 @@ export class Page {
 	 * ]);
 	 * ```
 	 */
-	async setCookies(cookies: Array<{ name: string; value: string; domain?: string; path?: string; httpOnly?: boolean; secure?: boolean; sameSite?: 'strict' | 'lax' | 'none'; expiry?: number }>): Promise<void> {
+	async setCookies(
+		cookies: Array<{
+			name: string;
+			value: string;
+			domain?: string;
+			path?: string;
+			httpOnly?: boolean;
+			secure?: boolean;
+			sameSite?: 'strict' | 'lax' | 'none';
+			expiry?: number;
+		}>,
+	): Promise<void> {
 		for (const cookie of cookies) {
 			const cookieHeader: NetworkSetCookieHeader = {
 				name: cookie.name,
@@ -530,11 +550,13 @@ export class Page {
 	 */
 	async clearCookies(filter?: { name?: string; domain?: string; path?: string }): Promise<void> {
 		await this.session.storage.deleteCookies({
-			filter: filter ? {
-				name: filter.name,
-				domain: filter.domain,
-				path: filter.path,
-			} : undefined,
+			filter: filter
+				? {
+						name: filter.name,
+						domain: filter.domain,
+						path: filter.path,
+					}
+				: undefined,
 			partition: { type: 'context', context: this.contextId },
 		});
 	}
@@ -552,9 +574,7 @@ export class Page {
 	 * ```
 	 */
 	async evaluate<T = unknown>(expression: string | (() => T)): Promise<T> {
-		const expr = typeof expression === 'function'
-			? `(${expression.toString()})()`
-			: expression;
+		const expr = typeof expression === 'function' ? `(${expression.toString()})()` : expression;
 
 		const result = await this.session.script.evaluate({
 			expression: expr,
@@ -607,10 +627,7 @@ export class Page {
 		const { method, urlPattern } = parseMockPattern(pattern);
 
 		// Subscribe to network events if not already
-		await this.session.subscribe(
-			['network.beforeRequestSent'],
-			[this.contextId],
-		);
+		await this.session.subscribe(['network.beforeRequestSent'], [this.contextId]);
 
 		// Add intercept
 		const result = await this.session.network.addIntercept({
@@ -736,7 +753,8 @@ export class Page {
 
 		// Scroll into view
 		await this.session.script.callFunction({
-			functionDeclaration: 'function(el) { el.scrollIntoView({ block: "center", behavior: "instant" }); }',
+			functionDeclaration:
+				'function(el) { el.scrollIntoView({ block: "center", behavior: "instant" }); }',
 			target: { context: this.contextId },
 			arguments: [ref],
 			awaitPromise: false,
@@ -746,16 +764,18 @@ export class Page {
 
 		await this.session.input.performActions({
 			context: this.contextId,
-			actions: [{
-				type: 'pointer',
-				id: 'touch',
-				parameters: { pointerType: 'touch' },
-				actions: [
-					{ type: 'pointerMove', x: pos.x, y: pos.y, origin: 'viewport' },
-					{ type: 'pointerDown', button: 0 },
-					{ type: 'pointerUp', button: 0 },
-				] as any,
-			}],
+			actions: [
+				{
+					type: 'pointer',
+					id: 'touch',
+					parameters: { pointerType: 'touch' },
+					actions: [
+						{ type: 'pointerMove', x: pos.x, y: pos.y, origin: 'viewport' },
+						{ type: 'pointerDown', button: 0 },
+						{ type: 'pointerUp', button: 0 },
+					] as any,
+				},
+			],
 		});
 	}
 
@@ -768,9 +788,8 @@ export class Page {
 	 */
 	async focus(target: ElementTarget, options?: { timeout?: number }): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const resolvedTarget: ElementTarget = typeof target === 'string'
-			? { label: target, name: target }
-			: target;
+		const resolvedTarget: ElementTarget =
+			typeof target === 'string' ? { label: target, name: target } : target;
 		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
 		const ref = this.getSharedRef(located.node);
 
@@ -791,9 +810,8 @@ export class Page {
 	 */
 	async blur(target: ElementTarget, options?: { timeout?: number }): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const resolvedTarget: ElementTarget = typeof target === 'string'
-			? { label: target, name: target }
-			: target;
+		const resolvedTarget: ElementTarget =
+			typeof target === 'string' ? { label: target, name: target } : target;
 		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
 		const ref = this.getSharedRef(located.node);
 
@@ -858,9 +876,8 @@ export class Page {
 	 */
 	async inputValue(target: ElementTarget, options?: { timeout?: number }): Promise<string> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const resolvedTarget: ElementTarget = typeof target === 'string'
-			? { label: target, name: target }
-			: target;
+		const resolvedTarget: ElementTarget =
+			typeof target === 'string' ? { label: target, name: target } : target;
 		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
 		const ref = this.getSharedRef(located.node);
 
@@ -881,11 +898,14 @@ export class Page {
 	 * await page.selectOption('Colors', ['red', 'blue']);
 	 * ```
 	 */
-	async selectOption(target: ElementTarget, values: string | string[], options?: FillOptions): Promise<void> {
+	async selectOption(
+		target: ElementTarget,
+		values: string | string[],
+		options?: FillOptions,
+	): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const resolvedTarget: ElementTarget = typeof target === 'string'
-			? { label: target, name: target }
-			: target;
+		const resolvedTarget: ElementTarget =
+			typeof target === 'string' ? { label: target, name: target } : target;
 		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
 		const ref = this.getSharedRef(located.node);
 		const valuesArray = Array.isArray(values) ? values : [values];
@@ -899,7 +919,10 @@ export class Page {
 				element.dispatchEvent(new Event('change', { bubbles: true }));
 			}`,
 			target: { context: this.contextId },
-			arguments: [ref, { type: 'array', value: valuesArray.map(v => ({ type: 'string' as const, value: v })) }],
+			arguments: [
+				ref,
+				{ type: 'array', value: valuesArray.map((v) => ({ type: 'string' as const, value: v })) },
+			],
 			awaitPromise: false,
 		});
 	}
@@ -911,7 +934,11 @@ export class Page {
 	 * await page.dragTo('Draggable', 'Drop Zone');
 	 * ```
 	 */
-	async dragTo(source: ElementTarget, dest: ElementTarget, options?: { timeout?: number }): Promise<void> {
+	async dragTo(
+		source: ElementTarget,
+		dest: ElementTarget,
+		options?: { timeout?: number },
+	): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
 
 		const sourceLoc = await locateElement(this.session, this.contextId, source, { timeout });
@@ -924,17 +951,19 @@ export class Page {
 
 		await this.session.input.performActions({
 			context: this.contextId,
-			actions: [{
-				type: 'pointer',
-				id: 'mouse',
-				parameters: { pointerType: 'mouse' },
-				actions: [
-					{ type: 'pointerMove', x: sourcePos.x, y: sourcePos.y, origin: 'viewport' },
-					{ type: 'pointerDown', button: 0 },
-					{ type: 'pointerMove', x: destPos.x, y: destPos.y, origin: 'viewport', duration: 300 },
-					{ type: 'pointerUp', button: 0 },
-				] as any,
-			}],
+			actions: [
+				{
+					type: 'pointer',
+					id: 'mouse',
+					parameters: { pointerType: 'mouse' },
+					actions: [
+						{ type: 'pointerMove', x: sourcePos.x, y: sourcePos.y, origin: 'viewport' },
+						{ type: 'pointerDown', button: 0 },
+						{ type: 'pointerMove', x: destPos.x, y: destPos.y, origin: 'viewport', duration: 300 },
+						{ type: 'pointerUp', button: 0 },
+					] as any,
+				},
+			],
 		});
 	}
 
@@ -950,14 +979,17 @@ export class Page {
 	 * await page.waitForSelector({ role: 'dialog' });
 	 * ```
 	 */
-	async waitForSelector(target: ElementTarget, options?: { timeout?: number; state?: 'attached' | 'visible' | 'hidden' }): Promise<ElementHandle> {
+	async waitForSelector(
+		target: ElementTarget,
+		options?: { timeout?: number; state?: 'attached' | 'visible' | 'hidden' },
+	): Promise<ElementHandle> {
 		const timeout = options?.timeout ?? this.config.timeout;
 		const state = options?.state ?? 'visible';
 
 		if (state === 'hidden') {
 			// Wait for the element to disappear
 			await waitFor(
-				`element to be hidden`,
+				'element to be hidden',
 				async () => {
 					try {
 						const elements = await locateAllElements(this.session, this.contextId, target);
@@ -974,7 +1006,8 @@ export class Page {
 							arguments: [ref],
 							awaitPromise: false,
 						});
-						const isHidden = result.type === 'success' &&
+						const isHidden =
+							result.type === 'success' &&
 							result.result?.type === 'boolean' &&
 							(result.result as { value: boolean }).value === true;
 						return isHidden ? true : null;
@@ -994,7 +1027,7 @@ export class Page {
 			// Also verify it's visible
 			const ref = this.getSharedRef(located.node);
 			await waitFor(
-				`element to be visible`,
+				'element to be visible',
 				async () => {
 					const result = await this.session.script.callFunction({
 						functionDeclaration: `function(el) {
@@ -1007,7 +1040,8 @@ export class Page {
 						arguments: [ref],
 						awaitPromise: false,
 					});
-					const isVisible = result.type === 'success' &&
+					const isVisible =
+						result.type === 'success' &&
 						result.result?.type === 'boolean' &&
 						(result.result as { value: boolean }).value === true;
 					return isVisible ? true : null;
@@ -1032,9 +1066,7 @@ export class Page {
 		options?: { timeout?: number },
 	): Promise<T> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const expr = typeof expression === 'function'
-			? `(${expression.toString()})()`
-			: expression;
+		const expr = typeof expression === 'function' ? `(${expression.toString()})()` : expression;
 
 		return waitFor(
 			'function to return truthy',
@@ -1108,7 +1140,8 @@ export class Page {
 	 */
 	async press(key: string): Promise<void> {
 		const keys = key.split('+');
-		const actions: Array<{ type: 'keyDown'; value: string } | { type: 'keyUp'; value: string }> = [];
+		const actions: Array<{ type: 'keyDown'; value: string } | { type: 'keyUp'; value: string }> =
+			[];
 
 		// Press modifiers down
 		for (const k of keys) {
@@ -1131,7 +1164,12 @@ export class Page {
 
 	/** Resolve a relative URL against the baseURL */
 	private resolveURL(url: string): string {
-		if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('about:') || url.startsWith('data:')) {
+		if (
+			url.startsWith('http://') ||
+			url.startsWith('https://') ||
+			url.startsWith('about:') ||
+			url.startsWith('data:')
+		) {
 			return url;
 		}
 		const base = this.config.baseURL.replace(/\/$/, '');
@@ -1174,8 +1212,14 @@ export class Page {
 				const map = new Map(val as [string, unknown][]);
 				const xVal = map.get('x');
 				const yVal = map.get('y');
-				const x = typeof xVal === 'object' && xVal !== null && 'value' in xVal ? (xVal as { value: number }).value : null;
-				const y = typeof yVal === 'object' && yVal !== null && 'value' in yVal ? (yVal as { value: number }).value : null;
+				const x =
+					typeof xVal === 'object' && xVal !== null && 'value' in xVal
+						? (xVal as { value: number }).value
+						: null;
+				const y =
+					typeof yVal === 'object' && yVal !== null && 'value' in yVal
+						? (yVal as { value: number }).value
+						: null;
 				if (x !== null && y !== null) {
 					return { x, y };
 				}
@@ -1184,7 +1228,7 @@ export class Page {
 
 		throw new Error(
 			'Cannot get element position: unexpected response from browser. ' +
-			'The element may not be visible or may not have a bounding rectangle.',
+				'The element may not be visible or may not have a bounding rectangle.',
 		);
 	}
 
@@ -1199,7 +1243,10 @@ export class Page {
 	 * The element is scrolled into view first so it's visible in headed mode
 	 * (important when users are watching the test run).
 	 */
-	private async scrollIntoViewAndClick(located: LocatedElement, options?: ClickOptions): Promise<void> {
+	private async scrollIntoViewAndClick(
+		located: LocatedElement,
+		options?: ClickOptions,
+	): Promise<void> {
 		const ref = this.getSharedRef(located.node);
 		const clickCount = options?.clickCount ?? 1;
 
@@ -1232,9 +1279,12 @@ export class Page {
 		if (!value || typeof value !== 'object') return value;
 		const v = value as { type: string; value?: unknown };
 		switch (v.type) {
-			case 'undefined': return undefined;
-			case 'null': return null;
-			case 'string': return v.value;
+			case 'undefined':
+				return undefined;
+			case 'null':
+				return null;
+			case 'string':
+				return v.value;
 			case 'number': {
 				const n = v.value;
 				if (n === 'NaN') return Number.NaN;
@@ -1243,8 +1293,10 @@ export class Page {
 				if (n === '-Infinity') return Number.NEGATIVE_INFINITY;
 				return n;
 			}
-			case 'boolean': return v.value;
-			case 'bigint': return BigInt(v.value as string);
+			case 'boolean':
+				return v.value;
+			case 'bigint':
+				return BigInt(v.value as string);
 			case 'array': {
 				if (Array.isArray(v.value)) {
 					return (v.value as unknown[]).map((item) => this.deserializeRemoteValue(item));
@@ -1320,7 +1372,7 @@ export class ElementHandle {
 		const ref = this.getRef(located);
 
 		const result = await this.page.session.script.callFunction({
-			functionDeclaration: `function(el, name) { return el.getAttribute(name); }`,
+			functionDeclaration: 'function(el, name) { return el.getAttribute(name); }',
 			target: { context: this.page.contextId },
 			arguments: [ref, { type: 'string', value: name }],
 			awaitPromise: false,
@@ -1353,9 +1405,11 @@ export class ElementHandle {
 				awaitPromise: false,
 			});
 
-			return result.type === 'success' &&
+			return (
+				result.type === 'success' &&
 				result.result?.type === 'boolean' &&
-				(result.result as { value: boolean }).value === true;
+				(result.result as { value: boolean }).value === true
+			);
 		} catch {
 			return false;
 		}
@@ -1434,9 +1488,11 @@ export class ElementHandle {
 				awaitPromise: false,
 			});
 
-			return result.type === 'success' &&
+			return (
+				result.type === 'success' &&
 				result.result?.type === 'boolean' &&
-				(result.result as { value: boolean }).value === true;
+				(result.result as { value: boolean }).value === true
+			);
 		} catch {
 			return false;
 		}
@@ -1455,9 +1511,11 @@ export class ElementHandle {
 				awaitPromise: false,
 			});
 
-			return result.type === 'success' &&
+			return (
+				result.type === 'success' &&
 				result.result?.type === 'boolean' &&
-				(result.result as { value: boolean }).value === true;
+				(result.result as { value: boolean }).value === true
+			);
 		} catch {
 			return false;
 		}
@@ -1485,9 +1543,16 @@ export class ElementHandle {
 					const map = new Map(val as [string, unknown][]);
 					const extract = (key: string) => {
 						const v = map.get(key);
-						return typeof v === 'object' && v !== null && 'value' in v ? (v as { value: number }).value : 0;
+						return typeof v === 'object' && v !== null && 'value' in v
+							? (v as { value: number }).value
+							: 0;
 					};
-					return { x: extract('x'), y: extract('y'), width: extract('width'), height: extract('height') };
+					return {
+						x: extract('x'),
+						y: extract('y'),
+						width: extract('width'),
+						height: extract('height'),
+					};
 				}
 			}
 			return null;
@@ -1503,7 +1568,8 @@ export class ElementHandle {
 
 		// Scroll into view first
 		await this.page.session.script.callFunction({
-			functionDeclaration: 'function(el) { el.scrollIntoView({ block: "center", behavior: "instant" }); }',
+			functionDeclaration:
+				'function(el) { el.scrollIntoView({ block: "center", behavior: "instant" }); }',
 			target: { context: this.page.contextId },
 			arguments: [ref],
 			awaitPromise: false,
@@ -1556,12 +1622,9 @@ export class ElementHandle {
 
 	/** @internal Locate the element with auto-wait */
 	async locate(timeout?: number): Promise<LocatedElement> {
-		return locateElement(
-			this.page.session,
-			this.page.contextId,
-			this.target,
-			{ timeout: timeout ?? 30_000 },
-		);
+		return locateElement(this.page.session, this.page.contextId, this.target, {
+			timeout: timeout ?? 30_000,
+		});
 	}
 
 	private getRef(located: LocatedElement): SharedReference {
@@ -1602,7 +1665,12 @@ function mapKey(key: string): string {
 }
 
 /** Parse "GET /api/users" or "/api/users" or "https://..." into method + urlPattern */
-function parseMockPattern(pattern: string): { method: string | null; urlPattern: { type: 'string'; pattern: string } | { type: 'pattern'; pathname?: string; protocol?: string; hostname?: string } } {
+function parseMockPattern(pattern: string): {
+	method: string | null;
+	urlPattern:
+		| { type: 'string'; pattern: string }
+		| { type: 'pattern'; pathname?: string; protocol?: string; hostname?: string };
+} {
 	const methodMatch = pattern.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(.+)$/i);
 	if (methodMatch) {
 		const method = methodMatch[1]!.toUpperCase();
@@ -1621,7 +1689,9 @@ function parseMockPattern(pattern: string): { method: string | null; urlPattern:
 }
 
 /** Build response headers for a mock */
-function buildMockHeaders(response: MockResponse): Array<{ name: string; value: { type: 'string'; value: string } }> {
+function buildMockHeaders(
+	response: MockResponse,
+): Array<{ name: string; value: { type: 'string'; value: string } }> {
 	const headers: Array<{ name: string; value: { type: 'string'; value: string } }> = [];
 
 	// Content-Type

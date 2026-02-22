@@ -41,10 +41,7 @@ export interface Feature {
 	language: string;
 }
 
-export type FeatureChild =
-	| { rule: Rule }
-	| { background: Background }
-	| { scenario: Scenario };
+export type FeatureChild = { rule: Rule } | { background: Background } | { scenario: Scenario };
 
 export interface Rule {
 	keyword: string;
@@ -55,9 +52,7 @@ export interface Rule {
 	line: number;
 }
 
-export type RuleChild =
-	| { background: Background }
-	| { scenario: Scenario };
+export type RuleChild = { background: Background } | { scenario: Scenario };
 
 export interface Background {
 	keyword: string;
@@ -746,11 +741,7 @@ function parseTableRow(state: ParserState): TableRow {
 	const parts = inner.split(/(?<!\\)\|/);
 
 	for (const part of parts) {
-		const value = part
-			.trim()
-			.replace(/\\\|/g, '|')
-			.replace(/\\n/g, '\n')
-			.replace(/\\\\/g, '\\');
+		const value = part.trim().replace(/\\\|/g, '|').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
 		cells.push({ value });
 	}
 

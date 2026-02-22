@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-// Test connecting to Chrome BiDi at /session path
-import { WebSocket } from '../packages/browsecraft-bidi/node_modules/ws/wrapper.mjs';
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+// Test connecting to Chrome BiDi at /session path
+import { WebSocket } from '../packages/browsecraft-bidi/node_modules/ws/wrapper.mjs';
 
 const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const userDataDir = await mkdtemp(join(tmpdir(), 'browsecraft-bidi-'));
@@ -68,11 +68,11 @@ try {
 	console.log('\n>>> SEND:', cmd);
 	ws.send(JSON.stringify(cmd));
 
-	await new Promise(r => setTimeout(r, 3000));
+	await new Promise((r) => setTimeout(r, 3000));
 	ws.close();
 } catch (err) {
 	console.log('Failed to connect to /session');
-	
+
 	// Try other known paths
 	for (const path of ['/devtools/browser', '/bidi', '/cdp']) {
 		const ep = `ws://${url.host}${path}`;
@@ -90,15 +90,15 @@ try {
 				});
 				setTimeout(() => reject(new Error('timeout')), 2000);
 			});
-			
+
 			ws2.on('message', (data) => {
 				console.log(`  <<< ${path} RECV:`, JSON.parse(data.toString('utf-8')));
 			});
-			
+
 			const cmd = { id: 1, method: 'session.new', params: { capabilities: {} } };
 			console.log(`  >>> ${path} SEND:`, cmd);
 			ws2.send(JSON.stringify(cmd));
-			await new Promise(r => setTimeout(r, 2000));
+			await new Promise((r) => setTimeout(r, 2000));
 			ws2.close();
 		} catch {
 			// continue

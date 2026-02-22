@@ -10,7 +10,7 @@
 // ============================================================================
 
 import type { BiDiSession, Locator, NodeRemoteValue } from 'browsecraft-bidi';
-import { waitFor, type WaitOptions } from './wait.js';
+import { type WaitOptions, waitFor } from './wait.js';
 
 /** What the user passes to click(), fill(), get() */
 export type ElementTarget = string | LocatorOptions;
@@ -91,10 +91,7 @@ export async function locateElement(
 							return { node, strategy };
 						}
 					}
-				} catch {
-					// This strategy didn't work -- try the next one
-					continue;
-				}
+				} catch {}
 			}
 
 			return null; // Not found yet -- waitFor will retry
@@ -125,9 +122,7 @@ export async function locateAllElements(
 			if (result.nodes.length > 0) {
 				return result.nodes.map((node) => ({ node, strategy }));
 			}
-		} catch {
-			continue;
-		}
+		} catch {}
 	}
 
 	return [];
@@ -163,7 +158,9 @@ function describeTarget(target: ElementTarget): string {
 }
 
 /** Build an ordered list of BiDi locator strategies to try */
-function buildStrategies(opts: LocatorOptions): Array<{ locator: Locator; strategy: string; isLabelLookup?: boolean }> {
+function buildStrategies(
+	opts: LocatorOptions,
+): Array<{ locator: Locator; strategy: string; isLabelLookup?: boolean }> {
 	const strategies: Array<{ locator: Locator; strategy: string; isLabelLookup?: boolean }> = [];
 	const matchType = opts.exact ? 'full' : 'partial';
 
@@ -324,9 +321,7 @@ async function resolveLabelsToInputs(
 			) {
 				return result.result as NodeRemoteValue;
 			}
-		} catch {
-			continue;
-		}
+		} catch {}
 	}
 
 	return null;

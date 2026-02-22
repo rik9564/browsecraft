@@ -6,7 +6,11 @@
 // Works WITH AI: generates complete, runnable test code.
 // ============================================================================
 
-import { githubModelsGenerate, isGitHubModelsAvailable, detectCapabilities } from './github-models.js';
+import {
+	detectCapabilities,
+	githubModelsGenerate,
+	isGitHubModelsAvailable,
+} from './github-models.js';
 
 export interface GenerateTestOptions {
 	/** Natural language description of what to test */
@@ -79,9 +83,7 @@ Import: import { test, expect } from 'browsecraft';
  * console.log(result.code);
  * ```
  */
-export async function generateTest(
-	options: GenerateTestOptions,
-): Promise<GeneratedTest> {
+export async function generateTest(options: GenerateTestOptions): Promise<GeneratedTest> {
 	const {
 		description,
 		url,
@@ -97,20 +99,15 @@ export async function generateTest(
 		const available = await isGitHubModelsAvailable(token);
 		if (available) {
 			const caps = await detectCapabilities(token);
-			const selectedModel =
-				model ?? caps.defaultModel;
+			const selectedModel = model ?? caps.defaultModel;
 
-			const aiResult = await generateWithAI(
-				description,
-				selectedModel,
-				{
-					url,
-					context,
-					token,
-					includeAssertions,
-					style,
-				},
-			);
+			const aiResult = await generateWithAI(description, selectedModel, {
+				url,
+				context,
+				token,
+				includeAssertions,
+				style,
+			});
 
 			if (aiResult) {
 				return {
@@ -201,11 +198,7 @@ Requirements:
 		.trim();
 
 	// Basic validation: must contain at least an import or function call
-	if (
-		!code.includes('import') &&
-		!code.includes('test(') &&
-		!code.includes('page.')
-	) {
+	if (!code.includes('import') && !code.includes('test(') && !code.includes('page.')) {
 		return null;
 	}
 

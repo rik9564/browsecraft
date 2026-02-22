@@ -29,16 +29,16 @@
 // ============================================================================
 
 import type {
-	ScenarioResult,
 	FeatureResult,
 	RunResult,
+	ScenarioResult,
 	StepResult,
 	StepStatus,
 } from './executor.js';
 import { computeSummary } from './executor.js';
+import { type HookContext, type HookRegistry, globalHookRegistry } from './hooks.js';
 import type { StepWorld } from './step-registry.js';
-import { type HookContext, globalHookRegistry, type HookRegistry } from './hooks.js';
-import { evaluateTagExpression, parseTagExpression, type TagExpression } from './tags.js';
+import { type TagExpression, evaluateTagExpression, parseTagExpression } from './tags.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -117,7 +117,11 @@ let collectedFeatures: PendingFeature[] = [];
  */
 export function feature(name: string, fn: () => void): void;
 export function feature(tags: string[], name: string, fn: () => void): void;
-export function feature(nameOrTags: string | string[], fnOrName?: (() => void) | string, maybeFn?: () => void): void {
+export function feature(
+	nameOrTags: string | string[],
+	fnOrName?: (() => void) | string,
+	maybeFn?: () => void,
+): void {
 	let name: string;
 	let tags: string[] = [];
 	let fn: () => void;
@@ -153,7 +157,11 @@ export function feature(nameOrTags: string | string[], fnOrName?: (() => void) |
  * ```
  */
 export function scenario(name: string, fn: (ctx: ScenarioContext) => void | Promise<void>): void;
-export function scenario(tags: string[], name: string, fn: (ctx: ScenarioContext) => void | Promise<void>): void;
+export function scenario(
+	tags: string[],
+	name: string,
+	fn: (ctx: ScenarioContext) => void | Promise<void>,
+): void;
 export function scenario(
 	nameOrTags: string | string[],
 	fnOrName?: ((ctx: ScenarioContext) => void | Promise<void>) | string,
@@ -270,9 +278,7 @@ export function afterEach(fn: StepFn): void {
 export async function runFeatures(options: TsBddOptions = {}): Promise<RunResult> {
 	const hooks = options.hooks ?? globalHookRegistry;
 	const stepTimeout = options.stepTimeout ?? 30000;
-	const tagFilter = options.tagFilter
-		? parseTagExpression(options.tagFilter)
-		: null;
+	const tagFilter = options.tagFilter ? parseTagExpression(options.tagFilter) : null;
 
 	const runStart = Date.now();
 	const featureResults: FeatureResult[] = [];
@@ -537,9 +543,10 @@ async function runTsStep(step: PendingStep, timeout: number): Promise<StepResult
 				result,
 				new Promise<never>((_, reject) =>
 					setTimeout(
-						() => reject(new Error(
-							`Step timed out after ${timeout}ms: "${step.keyword} ${step.text}"`,
-						)),
+						() =>
+							reject(
+								new Error(`Step timed out after ${timeout}ms: "${step.keyword} ${step.text}"`),
+							),
 						timeout,
 					),
 				),

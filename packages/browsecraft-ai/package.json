@@ -1,65 +1,62 @@
 {
-  "name": "browsecraft-ai",
-  "version": "0.1.2",
-  "description": "AI-powered self-healing, test generation, and visual regression for Browsecraft",
-  "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    }
-  },
-  "files": [
-    "dist",
-    "LICENSE"
-  ],
-  "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "clean": "rimraf dist",
-    "prepublishOnly": "npm run build"
-  },
-  "sideEffects": false,
-  "publishConfig": {
-    "access": "public"
-  },
-  "dependencies": {
-    "browsecraft-bidi": "workspace:*"
-  },
-  "devDependencies": {
-    "@types/node": "^22.10.0",
-    "tsup": "^8.3.5",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.0",
-    "rimraf": "^6.0.1"
-  },
-  "license": "MIT",
-  "author": "Browsecraft Contributors",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rik9564/browsecraft.git",
-    "directory": "packages/browsecraft-ai"
-  },
-  "homepage": "https://github.com/rik9564/browsecraft#readme",
-  "bugs": {
-    "url": "https://github.com/rik9564/browsecraft/issues"
-  },
-  "engines": {
-    "node": ">=20.0.0"
-  },
-  "keywords": [
-    "browsecraft",
-    "ai",
-    "self-healing",
-    "visual-regression",
-    "test-generation",
-    "github-models",
-    "github-copilot"
-  ]
+	"name": "browsecraft-ai",
+	"version": "0.1.2",
+	"description": "AI-powered self-healing, test generation, and visual regression for Browsecraft",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": ["dist", "LICENSE"],
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"clean": "rimraf dist",
+		"prepublishOnly": "npm run build"
+	},
+	"sideEffects": false,
+	"publishConfig": {
+		"access": "public"
+	},
+	"dependencies": {
+		"browsecraft-bidi": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^22.10.0",
+		"tsup": "^8.3.5",
+		"typescript": "^5.7.2",
+		"vitest": "^2.1.0",
+		"rimraf": "^6.0.1"
+	},
+	"license": "MIT",
+	"author": "Browsecraft Contributors",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/rik9564/browsecraft.git",
+		"directory": "packages/browsecraft-ai"
+	},
+	"homepage": "https://github.com/rik9564/browsecraft#readme",
+	"bugs": {
+		"url": "https://github.com/rik9564/browsecraft/issues"
+	},
+	"engines": {
+		"node": ">=20.0.0"
+	},
+	"keywords": [
+		"browsecraft",
+		"ai",
+		"self-healing",
+		"visual-regression",
+		"test-generation",
+		"github-models",
+		"github-copilot"
+	]
 }

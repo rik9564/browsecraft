@@ -4,9 +4,15 @@
 // This is the main entry point for the BiDi layer.
 // ============================================================================
 
+import { type BidiOverCdpConnection, connectBidiOverCdp } from './bidi-over-cdp.js';
+import {
+	type BrowserName,
+	type LaunchOptions,
+	type LaunchResult,
+	launchBrowser,
+} from './launcher.js';
 import { Transport, type TransportOptions } from './transport.js';
-import { launchBrowser, type BrowserName, type LaunchOptions, type LaunchResult } from './launcher.js';
-import { connectBidiOverCdp, type BidiOverCdpConnection } from './bidi-over-cdp.js';
+import type { EventHandler } from './transport.js';
 import type {
 	BiDiEvent,
 	BrowsingContextCaptureScreenshotParams,
@@ -15,6 +21,7 @@ import type {
 	BrowsingContextCreateParams,
 	BrowsingContextCreateResult,
 	BrowsingContextGetTreeResult,
+	BrowsingContextHandleUserPromptParams,
 	BrowsingContextInfo,
 	BrowsingContextLocateNodesParams,
 	BrowsingContextLocateNodesResult,
@@ -22,7 +29,6 @@ import type {
 	BrowsingContextNavigateResult,
 	BrowsingContextReloadParams,
 	BrowsingContextSetViewportParams,
-	BrowsingContextHandleUserPromptParams,
 	BrowsingContextTraverseHistoryParams,
 	InputPerformActionsParams,
 	InputReleaseActionsParams,
@@ -35,6 +41,7 @@ import type {
 	NetworkContinueWithAuthParams,
 	NetworkFailRequestParams,
 	NetworkProvideResponseParams,
+	NodeRemoteValue,
 	ScriptAddPreloadScriptParams,
 	ScriptAddPreloadScriptResult,
 	ScriptCallFunctionParams,
@@ -43,17 +50,15 @@ import type {
 	ScriptRemovePreloadScriptParams,
 	SessionNewResult,
 	SharedReference,
-	NodeRemoteValue,
+	StorageDeleteCookiesParams,
+	StorageDeleteCookiesResult,
 	StorageGetCookiesParams,
 	StorageGetCookiesResult,
 	StorageSetCookieParams,
 	StorageSetCookieResult,
-	StorageDeleteCookiesParams,
-	StorageDeleteCookiesResult,
 } from './types.js';
-import type { EventHandler } from './transport.js';
 
-export { type EventHandler } from './transport.js';
+export type { EventHandler } from './transport.js';
 
 /** Convert a typed params object to Record<string, unknown> for transport */
 function toParams(obj: object): Record<string, unknown> {
@@ -150,10 +155,7 @@ export class BiDiSession {
 		} else {
 			// Chrome/Edge: the wsEndpoint is a CDP endpoint, not BiDi.
 			// We use the chromium-bidi mapper to translate BiDi <-> CDP.
-			const cdpConn = await connectBidiOverCdp(
-				launchResult.wsEndpoint,
-				options.debug ?? false,
-			);
+			const cdpConn = await connectBidiOverCdp(launchResult.wsEndpoint, options.debug ?? false);
 			session.cdpConnection = cdpConn;
 
 			// Wire up the mapper to our Transport via virtual (in-memory) mode:
@@ -227,7 +229,10 @@ export class BiDiSession {
 	}
 
 	/** Send a raw BiDi command (escape hatch for advanced users) */
-	async send(method: string, params: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+	async send(
+		method: string,
+		params: Record<string, unknown> = {},
+	): Promise<Record<string, unknown>> {
 		return this.transport.send(method, params);
 	}
 
@@ -274,7 +279,10 @@ class BrowsingContextModule {
 	}
 
 	/** Get the browsing context tree */
-	async getTree(params?: { maxDepth?: number; root?: string }): Promise<BrowsingContextGetTreeResult> {
+	async getTree(params?: {
+		maxDepth?: number;
+		root?: string;
+	}): Promise<BrowsingContextGetTreeResult> {
 		return asResult(this.transport.send('browsingContext.getTree', params ? toParams(params) : {}));
 	}
 
@@ -294,7 +302,9 @@ class BrowsingContextModule {
 	}
 
 	/** Take a screenshot */
-	async captureScreenshot(params: BrowsingContextCaptureScreenshotParams): Promise<BrowsingContextCaptureScreenshotResult> {
+	async captureScreenshot(
+		params: BrowsingContextCaptureScreenshotParams,
+	): Promise<BrowsingContextCaptureScreenshotResult> {
 		return asResult(this.transport.send('browsingContext.captureScreenshot', toParams(params)));
 	}
 
@@ -304,7 +314,9 @@ class BrowsingContextModule {
 	}
 
 	/** Find elements in the page */
-	async locateNodes(params: BrowsingContextLocateNodesParams): Promise<BrowsingContextLocateNodesResult> {
+	async locateNodes(
+		params: BrowsingContextLocateNodesParams,
+	): Promise<BrowsingContextLocateNodesResult> {
 		return asResult(this.transport.send('browsingContext.locateNodes', toParams(params)));
 	}
 
@@ -337,7 +349,9 @@ class ScriptModule {
 	}
 
 	/** Add a preload script that runs before any page script */
-	async addPreloadScript(params: ScriptAddPreloadScriptParams): Promise<ScriptAddPreloadScriptResult> {
+	async addPreloadScript(
+		params: ScriptAddPreloadScriptParams,
+	): Promise<ScriptAddPreloadScriptResult> {
 		return asResult(this.transport.send('script.addPreloadScript', toParams(params)));
 	}
 

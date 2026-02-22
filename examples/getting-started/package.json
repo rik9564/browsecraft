@@ -1,15 +1,15 @@
 {
-  "name": "browsecraft-example-getting-started",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "description": "Getting started with Browsecraft — simple browser automation",
-  "scripts": {
-    "test": "node test.mjs",
-    "test:headed": "node test.mjs --headed",
-    "test:maximized": "node test.mjs --headed --maximized"
-  },
-  "dependencies": {
-    "browsecraft": "file:../../packages/browsecraft"
-  }
+	"name": "browsecraft-example-getting-started",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"description": "Getting started with Browsecraft — simple browser automation",
+	"scripts": {
+		"test": "node test.mjs",
+		"test:headed": "node test.mjs --headed",
+		"test:maximized": "node test.mjs --headed --maximized"
+	},
+	"dependencies": {
+		"browsecraft": "file:../../packages/browsecraft"
+	}
 }

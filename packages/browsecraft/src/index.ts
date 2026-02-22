@@ -12,7 +12,18 @@
 // ============================================================================
 
 // Core test API
-export { test, describe, beforeAll, afterAll, beforeEach, afterEach, testRegistry, runTest, runAfterAllHooks, resetTestState } from './test.js';
+export {
+	test,
+	describe,
+	beforeAll,
+	afterAll,
+	beforeEach,
+	afterEach,
+	testRegistry,
+	runTest,
+	runAfterAllHooks,
+	resetTestState,
+} from './test.js';
 export type { TestFixtures, TestCase, TestOptions, TestResult } from './test.js';
 
 // Assertions
@@ -39,11 +50,18 @@ export type { ElementTarget, LocatorOptions } from './locator.js';
 
 // Gherkin parser
 export { parseGherkin, getSupportedLanguages } from 'browsecraft-bdd';
-export type { GherkinDocument, Feature as GherkinFeature, Scenario as GherkinScenario } from 'browsecraft-bdd';
+export type {
+	GherkinDocument,
+	Feature as GherkinFeature,
+	Scenario as GherkinScenario,
+} from 'browsecraft-bdd';
 
 // Step definitions (Mode 1: Classic Gherkin)
 export {
-	Given, When, Then, Step,
+	Given,
+	When,
+	Then,
+	Step,
 	defineParameterType,
 	BrowsecraftDataTable,
 	globalRegistry,
@@ -52,12 +70,25 @@ export type { StepWorld, StepFunction, StepDefinition, StepMatch } from 'browsec
 
 // Executor
 export { BddExecutor, createExecutor, pending } from 'browsecraft-bdd';
-export type { ExecutorOptions, RunResult, FeatureResult, ScenarioResult, StepResult, StepStatus } from 'browsecraft-bdd';
+export type {
+	ExecutorOptions,
+	RunResult,
+	FeatureResult,
+	ScenarioResult,
+	StepResult,
+	StepStatus,
+} from 'browsecraft-bdd';
 
 // Hooks
 export {
-	Before, After, BeforeAll as BddBeforeAll, AfterAll as BddAfterAll,
-	BeforeFeature, AfterFeature, BeforeStep, AfterStep,
+	Before,
+	After,
+	BeforeAll as BddBeforeAll,
+	AfterAll as BddAfterAll,
+	BeforeFeature,
+	AfterFeature,
+	BeforeStep,
+	AfterStep,
 } from 'browsecraft-bdd';
 
 // Tags
@@ -65,8 +96,15 @@ export { parseTagExpression, matchesTags } from 'browsecraft-bdd';
 
 // TypeScript-native BDD (Mode 2)
 export {
-	feature, scenario, given, when, then, and, but,
-	runFeatures, clearFeatures,
+	feature,
+	scenario,
+	given,
+	when,
+	then,
+	and,
+	but,
+	runFeatures,
+	clearFeatures,
 } from 'browsecraft-bdd';
 export type { ScenarioContext, TsBddOptions } from 'browsecraft-bdd';
 

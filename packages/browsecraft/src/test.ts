@@ -13,12 +13,12 @@
 // });
 // ============================================================================
 
-import { Browser, BrowserContext } from './browser.js';
-import { Page } from './page.js';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { Browser, type BrowserContext } from './browser.js';
 import { resolveConfig } from './config.js';
 import type { UserConfig } from './config.js';
-import { writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import type { Page } from './page.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,7 +94,11 @@ const executedAfterAllHooks = new Set<string>();
  * ```
  */
 export function test(title: string, fn: (fixtures: TestFixtures) => Promise<void>): void;
-export function test(title: string, options: TestOptions, fn: (fixtures: TestFixtures) => Promise<void>): void;
+export function test(
+	title: string,
+	options: TestOptions,
+	fn: (fixtures: TestFixtures) => Promise<void>,
+): void;
 export function test(
 	title: string,
 	fnOrOptions: ((fixtures: TestFixtures) => Promise<void>) | TestOptions,
@@ -120,10 +124,7 @@ export function test(
  * test.skip('broken test', async ({ page }) => { ... });
  * ```
  */
-test.skip = function skipTest(
-	title: string,
-	fn: (fixtures: TestFixtures) => Promise<void>,
-): void {
+test.skip = function skipTest(title: string, fn: (fixtures: TestFixtures) => Promise<void>): void {
 	testRegistry.push({
 		title,
 		fn,
@@ -141,10 +142,7 @@ test.skip = function skipTest(
  * test.only('focused test', async ({ page }) => { ... });
  * ```
  */
-test.only = function onlyTest(
-	title: string,
-	fn: (fixtures: TestFixtures) => Promise<void>,
-): void {
+test.only = function onlyTest(title: string, fn: (fixtures: TestFixtures) => Promise<void>): void {
 	testRegistry.push({
 		title,
 		fn,
@@ -280,14 +278,14 @@ export async function runTest(
 
 	try {
 		// Use shared browser if provided, otherwise launch a new one
-		browser = sharedBrowser ?? await Browser.launch();
+		browser = sharedBrowser ?? (await Browser.launch());
 		context = await browser.newContext();
 		page = await context.newPage();
 
 		const fixtures: TestFixtures = { page, context, browser };
 
 		// Run beforeAll hooks (only for hooks that haven't been run yet for this suite)
-		const applicableBeforeAll = hooks.beforeAll.filter(h =>
+		const applicableBeforeAll = hooks.beforeAll.filter((h) =>
 			isHookApplicable(h.suitePath, testCase.suitePath),
 		);
 		for (const hook of applicableBeforeAll) {
@@ -299,7 +297,7 @@ export async function runTest(
 		}
 
 		// Run beforeEach hooks
-		const applicableBeforeEach = hooks.beforeEach.filter(h =>
+		const applicableBeforeEach = hooks.beforeEach.filter((h) =>
 			isHookApplicable(h.suitePath, testCase.suitePath),
 		);
 		for (const hook of applicableBeforeEach) {
@@ -316,7 +314,7 @@ export async function runTest(
 		]);
 
 		// Run afterEach hooks
-		const applicableAfterEach = hooks.afterEach.filter(h =>
+		const applicableAfterEach = hooks.afterEach.filter((h) =>
 			isHookApplicable(h.suitePath, testCase.suitePath),
 		);
 		for (const hook of applicableAfterEach) {
@@ -326,7 +324,9 @@ export async function runTest(
 		// Take screenshot on success if config says 'always'
 		let screenshotPath: string | undefined;
 		if (config.screenshot === 'always' && page) {
-			screenshotPath = await captureScreenshot(page, testCase, config.outputDir).catch(() => undefined);
+			screenshotPath = await captureScreenshot(page, testCase, config.outputDir).catch(
+				() => undefined,
+			);
 		}
 
 		const duration = Date.now() - startTime;
@@ -343,7 +343,9 @@ export async function runTest(
 		// Capture screenshot on failure if configured
 		let screenshotPath: string | undefined;
 		if ((config.screenshot === 'on-failure' || config.screenshot === 'always') && page) {
-			screenshotPath = await captureScreenshot(page, testCase, config.outputDir).catch(() => undefined);
+			screenshotPath = await captureScreenshot(page, testCase, config.outputDir).catch(
+				() => undefined,
+			);
 		}
 
 		return {
@@ -368,13 +370,8 @@ export async function runTest(
  * Run afterAll hooks for the given suite path.
  * Called by the runner after all tests in a suite have completed.
  */
-export async function runAfterAllHooks(
-	suitePath: string[],
-	fixtures: TestFixtures,
-): Promise<void> {
-	const applicableAfterAll = hooks.afterAll.filter(h =>
-		isHookApplicable(h.suitePath, suitePath),
-	);
+export async function runAfterAllHooks(suitePath: string[], fixtures: TestFixtures): Promise<void> {
+	const applicableAfterAll = hooks.afterAll.filter((h) => isHookApplicable(h.suitePath, suitePath));
 	for (const hook of applicableAfterAll) {
 		const hookKey = `${hook.suitePath.join('>')}:${hooks.afterAll.indexOf(hook)}`;
 		if (!executedAfterAllHooks.has(hookKey)) {
@@ -406,7 +403,11 @@ function isHookApplicable(hookSuitePath: string[], testSuitePath: string[]): boo
 }
 
 /** Capture a screenshot and save it to the output directory */
-async function captureScreenshot(page: Page, testCase: TestCase, outputDir: string): Promise<string> {
+async function captureScreenshot(
+	page: Page,
+	testCase: TestCase,
+	outputDir: string,
+): Promise<string> {
 	// Build a safe filename from suite path + test title
 	const parts = [...testCase.suitePath, testCase.title];
 	const safeName = parts

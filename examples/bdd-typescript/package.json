@@ -1,17 +1,17 @@
 {
-  "name": "browsecraft-example-bdd-typescript",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "description": "BDD in pure TypeScript — no .feature files needed",
-  "scripts": {
-    "test": "node test.mjs",
-    "test:smoke": "node test.mjs --tags \"@smoke\"",
-    "test:headed": "node test.mjs --headed",
-    "test:maximized": "node test.mjs --headed --maximized"
-  },
-  "dependencies": {
-    "browsecraft": "file:../../packages/browsecraft",
-    "browsecraft-bdd": "file:../../packages/browsecraft-bdd"
-  }
+	"name": "browsecraft-example-bdd-typescript",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"description": "BDD in pure TypeScript — no .feature files needed",
+	"scripts": {
+		"test": "node test.mjs",
+		"test:smoke": "node test.mjs --tags \"@smoke\"",
+		"test:headed": "node test.mjs --headed",
+		"test:maximized": "node test.mjs --headed --maximized"
+	},
+	"dependencies": {
+		"browsecraft": "file:../../packages/browsecraft",
+		"browsecraft-bdd": "file:../../packages/browsecraft-bdd"
+	}
 }

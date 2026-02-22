@@ -77,7 +77,12 @@ export class Transport {
 	async connect(url: string): Promise<void> {
 		return new Promise<void>((resolve, reject) => {
 			const timer = setTimeout(() => {
-				reject(new BiDiError('session not created', `Connection to ${url} timed out after ${this.timeout}ms`));
+				reject(
+					new BiDiError(
+						'session not created',
+						`Connection to ${url} timed out after ${this.timeout}ms`,
+					),
+				);
 			}, this.timeout);
 
 			this.ws = new WebSocket(url);
@@ -108,7 +113,9 @@ export class Transport {
 
 				// Reject all pending commands
 				for (const [id, cmd] of this.pending) {
-					cmd.reject(new BiDiError('unknown error', `Connection closed while waiting for command ${id}`));
+					cmd.reject(
+						new BiDiError('unknown error', `Connection closed while waiting for command ${id}`),
+					);
 					clearTimeout(cmd.timer);
 				}
 				this.pending.clear();
@@ -116,7 +123,12 @@ export class Transport {
 				if (wasConnected) {
 					this.onDisconnect?.(reason.toString('utf-8') || `code ${code}`);
 				} else {
-					reject(new BiDiError('session not created', `WebSocket closed before connection established (code: ${code})`));
+					reject(
+						new BiDiError(
+							'session not created',
+							`WebSocket closed before connection established (code: ${code})`,
+						),
+					);
 				}
 			});
 		});
@@ -151,7 +163,10 @@ export class Transport {
 	 * @param params - Command parameters
 	 * @returns Promise resolving to the command result
 	 */
-	async send(method: string, params: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+	async send(
+		method: string,
+		params: Record<string, unknown> = {},
+	): Promise<Record<string, unknown>> {
 		if (!this.connected) {
 			throw new BiDiError('session not created', 'Not connected to browser');
 		}
@@ -164,7 +179,9 @@ export class Transport {
 		return new Promise<Record<string, unknown>>((resolve, reject) => {
 			const timer = setTimeout(() => {
 				this.pending.delete(id);
-				reject(new BiDiError('unknown error', `Command "${method}" timed out after ${this.timeout}ms`));
+				reject(
+					new BiDiError('unknown error', `Command "${method}" timed out after ${this.timeout}ms`),
+				);
 			}, this.timeout);
 
 			this.pending.set(id, { resolve, reject, timer });
@@ -192,7 +209,7 @@ export class Transport {
 		if (!this.eventHandlers.has(eventName)) {
 			this.eventHandlers.set(eventName, new Set());
 		}
-		this.eventHandlers.get(eventName)!.add(handler);
+		this.eventHandlers.get(eventName)?.add(handler);
 
 		return () => {
 			this.eventHandlers.get(eventName)?.delete(handler);
@@ -230,7 +247,12 @@ export class Transport {
 		return new Promise<BiDiEvent>((resolve, reject) => {
 			const timer = setTimeout(() => {
 				unsubscribe();
-				reject(new BiDiError('unknown error', `Timed out waiting for event "${eventName}" after ${waitTimeout}ms`));
+				reject(
+					new BiDiError(
+						'unknown error',
+						`Timed out waiting for event "${eventName}" after ${waitTimeout}ms`,
+					),
+				);
 			}, waitTimeout);
 
 			const unsubscribe = this.on(eventName, (event) => {
@@ -318,13 +340,14 @@ export class Transport {
 			if (msg.type === 'success') {
 				pending.resolve(msg.result);
 			} else if (msg.type === 'error') {
-				pending.reject(
-					new BiDiError(msg.error, msg.message, msg.stacktrace),
-				);
+				pending.reject(new BiDiError(msg.error, msg.message, msg.stacktrace));
 			} else {
 				// Unknown response type -- shouldn't happen but handle gracefully
 				pending.reject(
-					new BiDiError('unknown error', `Unexpected response type: ${JSON.stringify(msg).slice(0, 200)}`),
+					new BiDiError(
+						'unknown error',
+						`Unexpected response type: ${JSON.stringify(msg).slice(0, 200)}`,
+					),
 				);
 			}
 		}

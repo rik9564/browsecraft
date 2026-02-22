@@ -17,14 +17,16 @@
 // Built from scratch. No external codegen dependency.
 // ============================================================================
 
-import {
-	isGitHubModelsAvailable,
-	githubModelsChat,
-	type ChatMessage,
-} from 'browsecraft-ai';
+import { type ChatMessage, githubModelsChat, isGitHubModelsAvailable } from 'browsecraft-ai';
 
-import { parseGherkin, type GherkinDocument, type Step, type Scenario, type Feature } from './gherkin-parser.js';
-import { type StepRegistry, globalRegistry, type StepDefinition } from './step-registry.js';
+import {
+	type Feature,
+	type GherkinDocument,
+	type Scenario,
+	type Step,
+	parseGherkin,
+} from './gherkin-parser.js';
+import { type StepDefinition, type StepRegistry, globalRegistry } from './step-registry.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -208,9 +210,13 @@ async function generateWithAI(
 
 	// Build the prompt
 	const existingDefs = registry.getAll();
-	const existingContext = existingDefs.length > 0
-		? `\n\nExisting step definitions for reference (match their style):\n${existingDefs.slice(0, 10).map((d) => `  ${d.type}('${d.pattern}', ...)`).join('\n')}`
-		: '';
+	const existingContext =
+		existingDefs.length > 0
+			? `\n\nExisting step definitions for reference (match their style):\n${existingDefs
+					.slice(0, 10)
+					.map((d) => `  ${d.type}('${d.pattern}', ...)`)
+					.join('\n')}`
+			: '';
 
 	const browscraftHints = includeHints
 		? `\n\nBrowsecraft Page API (use these methods in step implementations):
@@ -258,9 +264,7 @@ ${browscraftHints}${existingContext}${appContext}`,
 	const response = await githubModelsChat(messages, { model, temperature: 0.2 });
 
 	if (!response) {
-		return generateStubs(steps, [
-			'AI returned empty response. Falling back to stub generation.',
-		]);
+		return generateStubs(steps, ['AI returned empty response. Falling back to stub generation.']);
 	}
 
 	// Parse the AI response into individual step definitions
@@ -285,11 +289,9 @@ function generateStubs(steps: UniqueStep[], messages: string[]): AutoStepResult 
 		const { pattern, paramList } = inferPattern(step.text);
 		const keyword = normalizeKeyword(step.keyword);
 
-		const params = paramList.length > 0
-			? `, ${paramList.join(', ')}`
-			: '';
+		const params = paramList.length > 0 ? `, ${paramList.join(', ')}` : '';
 
-		const body = '  // TODO: implement this step\n  throw new Error(\'Step not implemented\');';
+		const body = "  // TODO: implement this step\n  throw new Error('Step not implemented');";
 		const code = `${keyword}('${pattern}', async ({ page }${params}) => {\n${body}\n});`;
 
 		generatedSteps.push({
@@ -302,7 +304,7 @@ function generateStubs(steps: UniqueStep[], messages: string[]): AutoStepResult 
 	}
 
 	const imports = "import { Given, When, Then } from 'browsecraft';\n\n";
-	const fileContent = imports + generatedSteps.map((s) => s.code).join('\n\n') + '\n';
+	const fileContent = `${imports + generatedSteps.map((s) => s.code).join('\n\n')}\n`;
 
 	return {
 		steps: generatedSteps,
@@ -369,10 +371,14 @@ function collectUniqueSteps(doc: GherkinDocument): UniqueStep[] {
 
 function normalizeKeyword(keyword: string): string {
 	switch (keyword) {
-		case 'Given': return 'Given';
-		case 'When': return 'When';
-		case 'Then': return 'Then';
-		default: return 'Given';
+		case 'Given':
+			return 'Given';
+		case 'When':
+			return 'When';
+		case 'Then':
+			return 'Then';
+		default:
+			return 'Given';
 	}
 }
 
@@ -413,7 +419,8 @@ function parseAIResponse(response: string, originalSteps: UniqueStep[]): Generat
 
 	// Try to extract individual step definitions from the AI response
 	// Match patterns like: Given('...', async (...) => { ... });
-	const stepRegex = /(Given|When|Then)\s*\(\s*['"`]([^'"`]+)['"`]\s*,\s*async\s*\([^)]*\)\s*=>\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}\s*\)/g;
+	const stepRegex =
+		/(Given|When|Then)\s*\(\s*['"`]([^'"`]+)['"`]\s*,\s*async\s*\([^)]*\)\s*=>\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}\s*\)/g;
 
 	let match: RegExpExecArray | null;
 	let idx = 0;

@@ -163,9 +163,7 @@ class TagExpressionParser {
 			return expr;
 		}
 
-		throw new Error(
-			`Expected tag or '(' but got '${token.type}' in tag expression`,
-		);
+		throw new Error(`Expected tag or '(' but got '${token.type}' in tag expression`);
 	}
 
 	private peek(): Token {
@@ -181,9 +179,7 @@ class TagExpressionParser {
 	private expect(type: Token['type']): void {
 		const token = this.peek();
 		if (token.type !== type) {
-			throw new Error(
-				`Expected '${type}' but got '${token.type}' in tag expression`,
-			);
+			throw new Error(`Expected '${type}' but got '${token.type}' in tag expression`);
 		}
 		this.advance();
 	}

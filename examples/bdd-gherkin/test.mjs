@@ -23,16 +23,11 @@
 // ============================================================================
 
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { Browser } from 'browsecraft';
-import {
-	parseGherkin,
-	Given, When, Then,
-	BddExecutor,
-	globalRegistry,
-} from 'browsecraft-bdd';
+import { BddExecutor, Given, Then, When, globalRegistry, parseGherkin } from 'browsecraft-bdd';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -72,8 +67,8 @@ When('I fill {string} with {string}', async (world, field, value) => {
 
 	// Map human-readable names to selectors. This keeps .feature files clean.
 	const fieldMap = {
-		'Username': '[data-test="username"]',
-		'Password': '[data-test="password"]',
+		Username: '[data-test="username"]',
+		Password: '[data-test="password"]',
 		'First Name': '[data-test="firstName"]',
 		'Last Name': '[data-test="lastName"]',
 		'Zip/Postal Code': '[data-test="postalCode"]',
@@ -92,16 +87,16 @@ When('I click {string}', async (world, text) => {
 	const page = world.page;
 
 	const clickMap = {
-		'Login': '[data-test="login-button"]',
-		'Checkout': '[data-test="checkout"]',
-		'Continue': '[data-test="continue"]',
-		'Finish': '[data-test="finish"]',
+		Login: '[data-test="login-button"]',
+		Checkout: '[data-test="checkout"]',
+		Continue: '[data-test="continue"]',
+		Finish: '[data-test="finish"]',
 		'Continue Shopping': '[data-test="continue-shopping"]',
 	};
 
 	const navWait = {
-		'Continue': 'checkout-step-two',
-		'Finish': 'checkout-complete',
+		Continue: 'checkout-step-two',
+		Finish: 'checkout-complete',
 	};
 
 	const selector = clickMap[text];
@@ -230,14 +225,11 @@ async function main() {
 
 	// 1. Read and parse the .feature file
 	const __dirname = dirname(fileURLToPath(import.meta.url));
-	const featureSource = readFileSync(
-		join(__dirname, 'features', 'saucelabs.feature'),
-		'utf-8',
-	);
+	const featureSource = readFileSync(join(__dirname, 'features', 'saucelabs.feature'), 'utf-8');
 	const document = parseGherkin(featureSource, 'saucelabs.feature');
 
 	console.log(`  ${DIM}Parsed: ${document.feature?.name ?? 'unknown'}${RESET}`);
-	const scenarioCount = document.feature?.children?.filter(c => 'scenario' in c).length ?? 0;
+	const scenarioCount = document.feature?.children?.filter((c) => 'scenario' in c).length ?? 0;
 	console.log(`  ${DIM}Scenarios: ${scenarioCount}${RESET}\n`);
 
 	// 2. Launch browser
@@ -275,11 +267,16 @@ async function main() {
 				console.log(`  ${BOLD}Scenario: ${scenario.name}${RESET}`);
 			},
 			onStepEnd: (result) => {
-				const icon = result.status === 'passed' ? PASS
-					: result.status === 'failed' ? FAIL
-					: result.status === 'skipped' ? SKIP
-					: result.status === 'undefined' ? `${RED}?${RESET}`
-					: PEND;
+				const icon =
+					result.status === 'passed'
+						? PASS
+						: result.status === 'failed'
+							? FAIL
+							: result.status === 'skipped'
+								? SKIP
+								: result.status === 'undefined'
+									? `${RED}?${RESET}`
+									: PEND;
 				const duration = result.duration > 0 ? ` ${DIM}(${result.duration}ms)${RESET}` : '';
 				console.log(`    ${icon} ${result.keyword} ${result.text}${duration}`);
 				if (result.error && result.status !== 'skipped') {
@@ -288,11 +285,17 @@ async function main() {
 				}
 			},
 			onScenarioEnd: (result) => {
-				const statusColor = result.status === 'passed' ? GREEN
-					: result.status === 'failed' ? RED
-					: result.status === 'skipped' ? YELLOW
-					: CYAN;
-				console.log(`    ${statusColor}=> ${result.status}${RESET} ${DIM}(${result.duration}ms)${RESET}\n`);
+				const statusColor =
+					result.status === 'passed'
+						? GREEN
+						: result.status === 'failed'
+							? RED
+							: result.status === 'skipped'
+								? YELLOW
+								: CYAN;
+				console.log(
+					`    ${statusColor}=> ${result.status}${RESET} ${DIM}(${result.duration}ms)${RESET}\n`,
+				);
 			},
 		});
 
@@ -307,9 +310,15 @@ async function main() {
 		// 6. Print summary
 		const { summary } = result;
 		console.log(`${BOLD}============================================${RESET}`);
-		console.log(`  Features:  ${summary.features.passed} passed, ${summary.features.failed} failed, ${summary.features.total} total`);
-		console.log(`  Scenarios: ${GREEN}${summary.scenarios.passed} passed${RESET}, ${RED}${summary.scenarios.failed} failed${RESET}, ${YELLOW}${summary.scenarios.skipped} skipped${RESET}, ${summary.scenarios.total} total`);
-		console.log(`  Steps:     ${GREEN}${summary.steps.passed} passed${RESET}, ${RED}${summary.steps.failed} failed${RESET}, ${YELLOW}${summary.steps.skipped} skipped${RESET}, ${summary.steps.undefined} undefined, ${summary.steps.total} total`);
+		console.log(
+			`  Features:  ${summary.features.passed} passed, ${summary.features.failed} failed, ${summary.features.total} total`,
+		);
+		console.log(
+			`  Scenarios: ${GREEN}${summary.scenarios.passed} passed${RESET}, ${RED}${summary.scenarios.failed} failed${RESET}, ${YELLOW}${summary.scenarios.skipped} skipped${RESET}, ${summary.scenarios.total} total`,
+		);
+		console.log(
+			`  Steps:     ${GREEN}${summary.steps.passed} passed${RESET}, ${RED}${summary.steps.failed} failed${RESET}, ${YELLOW}${summary.steps.skipped} skipped${RESET}, ${summary.steps.undefined} undefined, ${summary.steps.total} total`,
+		);
 		console.log(`  Duration:  ${(result.duration / 1000).toFixed(1)}s`);
 		console.log(`${BOLD}============================================${RESET}\n`);
 

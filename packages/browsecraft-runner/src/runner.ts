@@ -6,10 +6,10 @@
 // Test execution is delegated via callbacks provided by the CLI.
 // ============================================================================
 
-import { resolve, relative, join } from 'node:path';
 import { existsSync, readdirSync, statSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { RunnerOptions, TestResult, RunSummary } from './types.js';
+import type { RunSummary, RunnerOptions, TestResult } from './types.js';
 
 /** A test case as passed to the runner from the browsecraft package */
 export interface RunnableTest {
@@ -61,7 +61,9 @@ export class TestRunner {
 			return 0;
 		}
 
-		console.log(`\n  Browsecraft - Running ${files.length} test file${files.length > 1 ? 's' : ''}\n`);
+		console.log(
+			`\n  Browsecraft - Running ${files.length} test file${files.length > 1 ? 's' : ''}\n`,
+		);
 
 		// Step 2: Load and run each test file
 		const allResults: TestResult[] = [];
@@ -78,14 +80,12 @@ export class TestRunner {
 
 				// Apply grep filter
 				const filteredTests = this.options.grep
-					? tests.filter(t => t.title.includes(this.options.grep!))
+					? tests.filter((t) => t.title.includes(this.options.grep!))
 					: tests;
 
 				// Check for .only tests
-				const hasOnly = filteredTests.some(t => t.only);
-				const testsToRun = hasOnly
-					? filteredTests.filter(t => t.only)
-					: filteredTests;
+				const hasOnly = filteredTests.some((t) => t.only);
+				const testsToRun = hasOnly ? filteredTests.filter((t) => t.only) : filteredTests;
 
 				// Run each test
 				for (const test of testsToRun) {
@@ -108,9 +108,7 @@ export class TestRunner {
 
 					// Print result
 					const prefix = this.getStatusIcon(result.status);
-					const suiteName = result.suitePath.length > 0
-						? `${result.suitePath.join(' > ')} > `
-						: '';
+					const suiteName = result.suitePath.length > 0 ? `${result.suitePath.join(' > ')} > ` : '';
 					const duration = result.status !== 'skipped' ? ` (${result.duration}ms)` : '';
 
 					console.log(`    ${prefix} ${suiteName}${result.title}${duration}`);
@@ -129,13 +127,13 @@ export class TestRunner {
 				};
 				allResults.push(errorResult);
 				console.log(`    ${this.getStatusIcon('failed')} ${errorResult.title}`);
-				console.log(`      ${errorResult.error!.message}`);
+				console.log(`      ${errorResult.error?.message}`);
 			}
 
 			console.log('');
 
 			// Check bail
-			if (this.options.bail && allResults.some(r => r.status === 'failed')) {
+			if (this.options.bail && allResults.some((r) => r.status === 'failed')) {
 				bail = true;
 			}
 		}
@@ -154,7 +152,7 @@ export class TestRunner {
 	discoverFiles(): string[] {
 		// If specific files are provided, use those
 		if (this.options.files && this.options.files.length > 0) {
-			return this.options.files.map(f => resolve(process.cwd(), f)).filter(f => existsSync(f));
+			return this.options.files.map((f) => resolve(process.cwd(), f)).filter((f) => existsSync(f));
 		}
 
 		// Otherwise, find files matching the test pattern
@@ -172,7 +170,7 @@ export class TestRunner {
 		// Extract extensions from pattern like '*.test.{ts,js,mts,mjs}'
 		const extMatch = pattern.match(/\.\{([^}]+)\}$/);
 		const extensions = extMatch
-			? extMatch[1]!.split(',').map(e => e.trim())
+			? (extMatch[1]?.split(',').map((e) => e.trim()) ?? ['ts', 'js'])
 			: ['ts', 'js'];
 
 		// Extract the suffix part (e.g., '.test')
@@ -209,9 +207,7 @@ export class TestRunner {
 				this.walkDir(fullPath, results, extensions, suffix);
 			} else if (stat.isFile()) {
 				// Check if file matches pattern like "foo.test.ts"
-				const matchesPattern = extensions.some(ext =>
-					entry.endsWith(`${suffix}.${ext}`),
-				);
+				const matchesPattern = extensions.some((ext) => entry.endsWith(`${suffix}.${ext}`));
 				if (matchesPattern) {
 					results.push(fullPath);
 				}
@@ -225,19 +221,23 @@ export class TestRunner {
 
 	private getStatusIcon(status: string): string {
 		switch (status) {
-			case 'passed': return '\x1b[32m+\x1b[0m';
-			case 'failed': return '\x1b[31mx\x1b[0m';
-			case 'skipped': return '\x1b[33m-\x1b[0m';
-			default: return ' ';
+			case 'passed':
+				return '\x1b[32m+\x1b[0m';
+			case 'failed':
+				return '\x1b[31mx\x1b[0m';
+			case 'skipped':
+				return '\x1b[33m-\x1b[0m';
+			default:
+				return ' ';
 		}
 	}
 
 	private summarize(results: TestResult[], totalDuration: number): RunSummary {
 		return {
 			total: results.length,
-			passed: results.filter(r => r.status === 'passed').length,
-			failed: results.filter(r => r.status === 'failed').length,
-			skipped: results.filter(r => r.status === 'skipped').length,
+			passed: results.filter((r) => r.status === 'passed').length,
+			failed: results.filter((r) => r.status === 'failed').length,
+			skipped: results.filter((r) => r.status === 'skipped').length,
 			duration: totalDuration,
 			results,
 		};

@@ -9,13 +9,13 @@
 // npx browsecraft --help            # Show help
 // ============================================================================
 
-import { resolve, join } from 'node:path';
-import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { TestRunner, type RunnerOptions, type RunnableTest } from 'browsecraft-runner';
-import { resolveConfig, type UserConfig } from './config.js';
-import { testRegistry, runTest, runAfterAllHooks, type TestCase } from './test.js';
+import { type RunnableTest, type RunnerOptions, TestRunner } from 'browsecraft-runner';
 import { Browser } from './browser.js';
+import { type UserConfig, resolveConfig } from './config.js';
+import { type TestCase, runAfterAllHooks, runTest, testRegistry } from './test.js';
 
 const VERSION = '0.1.0';
 
@@ -60,7 +60,7 @@ async function main() {
 async function runTests(args: string[]) {
 	// Parse CLI flags
 	const flags = parseFlags(args);
-	const filePatterns = args.filter(a => !a.startsWith('--'));
+	const filePatterns = args.filter((a) => !a.startsWith('--'));
 
 	// Load config file if it exists
 	const userConfig = await loadConfig();
@@ -108,7 +108,7 @@ async function runTests(args: string[]) {
 
 		const fileUrl = pathToFileURL(file).href;
 		await import(fileUrl);
-		return testRegistry.slice(startIdx).map(tc => ({
+		return testRegistry.slice(startIdx).map((tc) => ({
 			title: tc.title,
 			suitePath: tc.suitePath,
 			skip: tc.skip,
@@ -161,7 +161,9 @@ async function initProject() {
 	// Create config file
 	const configPath = join(cwd, 'browsecraft.config.ts');
 	if (!existsSync(configPath)) {
-		writeFileSync(configPath, `import { defineConfig } from 'browsecraft';
+		writeFileSync(
+			configPath,
+			`import { defineConfig } from 'browsecraft';
 
 export default defineConfig({
   // Browser to use: 'chrome' | 'firefox' | 'edge'
@@ -179,7 +181,8 @@ export default defineConfig({
   // Take screenshots on failure
   screenshot: 'on-failure',
 });
-`);
+`,
+		);
 		console.log('  Created browsecraft.config.ts');
 	} else {
 		console.log('  browsecraft.config.ts already exists, skipping');
@@ -193,7 +196,9 @@ export default defineConfig({
 
 	const exampleTest = join(testsDir, 'example.test.ts');
 	if (!existsSync(exampleTest)) {
-		writeFileSync(exampleTest, `import { test, expect } from 'browsecraft';
+		writeFileSync(
+			exampleTest,
+			`import { test, expect } from 'browsecraft';
 
 test('homepage has correct title', async ({ page }) => {
   await page.goto('https://example.com');
@@ -205,7 +210,8 @@ test('can navigate to more info', async ({ page }) => {
   await page.click('More information');
   await expect(page).toHaveURL(/iana\\.org/);
 });
-`);
+`,
+		);
 		console.log('  Created tests/example.test.ts');
 	} else {
 		console.log('  tests/example.test.ts already exists, skipping');
@@ -214,7 +220,7 @@ test('can navigate to more info', async ({ page }) => {
 	// Add .browsecraft to .gitignore
 	const gitignorePath = join(cwd, '.gitignore');
 	if (existsSync(gitignorePath)) {
-		const content = await import('node:fs').then(fs => fs.readFileSync(gitignorePath, 'utf-8'));
+		const content = await import('node:fs').then((fs) => fs.readFileSync(gitignorePath, 'utf-8'));
 		if (!content.includes('.browsecraft')) {
 			writeFileSync(gitignorePath, `${content.trimEnd()}\n\n# Browsecraft\n.browsecraft/\n`);
 			console.log('  Updated .gitignore');
@@ -299,10 +305,10 @@ async function ensureTypeScriptLoader(): Promise<void> {
 	// If neither tsx nor ts-node is available, give a helpful error
 	console.error(
 		'\n  Error: Cannot import TypeScript test files.\n' +
-		'  Install tsx (recommended) or ts-node:\n\n' +
-		'    npm install -D tsx\n\n' +
-		'  Or run browsecraft with tsx:\n\n' +
-		'    npx tsx node_modules/.bin/browsecraft test\n',
+			'  Install tsx (recommended) or ts-node:\n\n' +
+			'    npm install -D tsx\n\n' +
+			'  Or run browsecraft with tsx:\n\n' +
+			'    npx tsx node_modules/.bin/browsecraft test\n',
 	);
 	process.exit(1);
 }

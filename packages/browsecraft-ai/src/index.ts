@@ -18,4 +18,8 @@ export {
 } from './github-models.js';
 export { healSelector, type HealResult, type PageSnapshot } from './self-healing.js';
 export { generateTest, type GenerateTestOptions, type GeneratedTest } from './test-gen.js';
-export { compareScreenshots, type VisualDiffResult, type VisualDiffOptions } from './visual-diff.js';
+export {
+	compareScreenshots,
+	type VisualDiffResult,
+	type VisualDiffOptions,
+} from './visual-diff.js';

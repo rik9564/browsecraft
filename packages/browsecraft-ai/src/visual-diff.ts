@@ -11,7 +11,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createInflate } from 'node:zlib';
-import { githubModelsChat, isGitHubModelsAvailable, type ChatMessage } from './github-models.js';
+import { type ChatMessage, githubModelsChat, isGitHubModelsAvailable } from './github-models.js';
 
 export interface VisualDiffOptions {
 	/** Allowed pixel difference threshold per channel (0-255, default 5) */
@@ -100,14 +100,8 @@ export async function compareScreenshots(
 	} = options;
 
 	// Load images
-	const baselineBuf =
-		typeof baseline === 'string'
-			? await readFile(resolve(baseline))
-			: baseline;
-	const currentBuf =
-		typeof current === 'string'
-			? await readFile(resolve(current))
-			: current;
+	const baselineBuf = typeof baseline === 'string' ? await readFile(resolve(baseline)) : baseline;
+	const currentBuf = typeof current === 'string' ? await readFile(resolve(current)) : current;
 
 	// Parse PNGs
 	const img1 = await decodePNG(baselineBuf);
@@ -131,11 +125,7 @@ export async function compareScreenshots(
 	const ignoreMask = new Uint8Array(totalPixels);
 	for (const region of ignoreRegions) {
 		for (let y = region.y; y < region.y + region.height && y < height; y++) {
-			for (
-				let x = region.x;
-				x < region.x + region.width && x < width;
-				x++
-			) {
+			for (let x = region.x; x < region.x + region.width && x < width; x++) {
 				ignoreMask[y * width + x] = 1;
 			}
 		}
@@ -143,9 +133,7 @@ export async function compareScreenshots(
 
 	// Pixel-by-pixel comparison
 	let diffPixels = 0;
-	const diffData = diffOutputPath
-		? new Uint8Array(width * height * 4)
-		: null;
+	const diffData = diffOutputPath ? new Uint8Array(width * height * 4) : null;
 
 	for (let y = 0; y < height; y++) {
 		for (let x = 0; x < width; x++) {
@@ -228,11 +216,7 @@ export async function compareScreenshots(
 	// ask GPT-4o vision whether the screenshots are semantically equivalent
 	if (!match && options.useAI) {
 		try {
-			const aiAnalysis = await semanticCompare(
-				baselineBuf,
-				currentBuf,
-				options.token,
-			);
+			const aiAnalysis = await semanticCompare(baselineBuf, currentBuf, options.token);
 			if (aiAnalysis) {
 				result.aiAnalysis = aiAnalysis;
 				// If AI says they match semantically, override the pixel result
@@ -334,11 +318,7 @@ function isAntiAliased(
 	width: number,
 	height: number,
 ): boolean {
-	const hasHighContrastNeighbor = (
-		data: Uint8Array,
-		cx: number,
-		cy: number,
-	): boolean => {
+	const hasHighContrastNeighbor = (data: Uint8Array, cx: number, cy: number): boolean => {
 		const ci = (cy * width + cx) * 4;
 		const cr = b(data, ci);
 		const cg = b(data, ci + 1);
@@ -365,10 +345,7 @@ function isAntiAliased(
 		return contrastCount >= 3;
 	};
 
-	return (
-		hasHighContrastNeighbor(data1, x, y) ||
-		hasHighContrastNeighbor(data2, x, y)
-	);
+	return hasHighContrastNeighbor(data1, x, y) || hasHighContrastNeighbor(data2, x, y);
 }
 
 // ---------------------------------------------------------------------------
@@ -457,9 +434,7 @@ async function decodePNG(buf: Buffer): Promise<DecodedImage> {
 	}
 
 	if (bitDepth !== 8) {
-		throw new Error(
-			`Only 8-bit PNGs supported by visual-diff, got ${bitDepth}-bit`,
-		);
+		throw new Error(`Only 8-bit PNGs supported by visual-diff, got ${bitDepth}-bit`);
 	}
 
 	const bytesPerPixel = channels;

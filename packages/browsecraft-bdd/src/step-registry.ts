@@ -10,7 +10,7 @@
 // - Global + scoped step registries
 // ============================================================================
 
-import type { DataTable as GherkinDataTable, DocString } from './gherkin-parser.js';
+import type { DocString, DataTable as GherkinDataTable } from './gherkin-parser.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,10 +30,7 @@ export interface StepWorld {
 	log: (message: string) => void;
 }
 
-export type StepFunction = (
-	world: StepWorld,
-	...args: unknown[]
-) => void | Promise<void>;
+export type StepFunction = (world: StepWorld, ...args: unknown[]) => void | Promise<void>;
 
 export interface StepDefinition {
 	/** Original pattern (string or regex) */
@@ -80,12 +77,12 @@ const BUILT_IN_PARAMETERS: ParameterType[] = [
 	{
 		name: 'int',
 		regex: '(-?\\d+)',
-		transform: (s) => parseInt(s, 10),
+		transform: (s) => Number.parseInt(s, 10),
 	},
 	{
 		name: 'float',
 		regex: '(-?\\d+\\.\\d+)',
-		transform: (s) => parseFloat(s),
+		transform: (s) => Number.parseFloat(s),
 	},
 	{
 		name: 'word',
@@ -124,14 +121,12 @@ export class StepRegistry {
 		const { regex, paramNames } = this.compilePattern(pattern);
 
 		// Check for duplicates
-		const existing = this.steps.find(
-			(s) => s.regex.source === regex.source && s.type === type,
-		);
+		const existing = this.steps.find((s) => s.regex.source === regex.source && s.type === type);
 		if (existing) {
 			const loc = options?.location ? ` at ${options.location.file}:${options.location.line}` : '';
 			throw new Error(
 				`Duplicate step definition: "${pattern}"${loc}. ` +
-				`Already registered as "${existing.pattern}"`,
+					`Already registered as "${existing.pattern}"`,
 			);
 		}
 
@@ -497,11 +492,7 @@ function levenshtein(a: string, b: string): number {
 		let prev = i;
 		for (let j = 1; j <= n; j++) {
 			const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-			const val = Math.min(
-				(row[j] ?? 0) + 1,
-				prev + 1,
-				(row[j - 1] ?? 0) + cost,
-			);
+			const val = Math.min((row[j] ?? 0) + 1, prev + 1, (row[j - 1] ?? 0) + cost);
 			row[j - 1] = prev;
 			prev = val;
 		}

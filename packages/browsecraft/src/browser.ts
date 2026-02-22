@@ -4,8 +4,8 @@
 // ============================================================================
 
 import { BiDiSession, type SessionOptions } from 'browsecraft-bidi';
+import { type BrowsecraftConfig, type UserConfig, resolveConfig } from './config.js';
 import { Page } from './page.js';
-import { resolveConfig, type BrowsecraftConfig, type UserConfig } from './config.js';
 
 // ---------------------------------------------------------------------------
 // Shared viewport setup helper (used by both Browser and BrowserContext)
@@ -180,9 +180,7 @@ export class Browser {
 			return new BrowserContext(this.session, this.config, userContext);
 		} catch (err) {
 			console.warn(
-				'[browsecraft] Warning: browser.createUserContext is not supported. ' +
-				'Pages will share cookies/storage. ' +
-				(err instanceof Error ? err.message : String(err)),
+				`[browsecraft] Warning: browser.createUserContext is not supported. Pages will share cookies/storage. ${err instanceof Error ? err.message : String(err)}`,
 			);
 			return new BrowserContext(this.session, this.config, null);
 		}
@@ -257,9 +255,11 @@ export class BrowserContext {
 		this.pages = [];
 
 		if (this.userContext) {
-			await this.session.send('browser.removeUserContext', {
-				userContext: this.userContext,
-			}).catch(() => {});
+			await this.session
+				.send('browser.removeUserContext', {
+					userContext: this.userContext,
+				})
+				.catch(() => {});
 		}
 	}
 }

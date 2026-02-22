@@ -34,11 +34,7 @@ const API_ENDPOINT = 'https://models.github.ai/inference/chat/completions';
  */
 export function resolveToken(explicitToken?: string): string | null {
 	if (explicitToken) return explicitToken;
-	return (
-		process.env.BROWSECRAFT_GITHUB_TOKEN ??
-		process.env.GITHUB_TOKEN ??
-		null
-	);
+	return process.env.BROWSECRAFT_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN ?? null;
 }
 
 /**
@@ -50,9 +46,7 @@ export function resolveToken(explicitToken?: string): string | null {
  * }
  * ```
  */
-export async function isGitHubModelsAvailable(
-	token?: string,
-): Promise<boolean> {
+export async function isGitHubModelsAvailable(token?: string): Promise<boolean> {
 	const resolved = resolveToken(token);
 	if (!resolved) return false;
 
@@ -93,9 +87,7 @@ export async function isGitHubModelsAvailable(
  * }
  * ```
  */
-export async function detectCapabilities(
-	token?: string,
-): Promise<AICapabilities> {
+export async function detectCapabilities(token?: string): Promise<AICapabilities> {
 	const unavailable: AICapabilities = {
 		available: false,
 		hasVision: false,

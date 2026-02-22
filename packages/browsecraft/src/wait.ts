@@ -45,9 +45,7 @@ export async function waitFor<T>(
 
 	const elapsed = Date.now() - startTime;
 	const errorMsg = lastError ? `\nLast error: ${lastError.message}` : '';
-	throw new Error(
-		`Timed out after ${elapsed}ms waiting for: ${description}${errorMsg}`,
-	);
+	throw new Error(`Timed out after ${elapsed}ms waiting for: ${description}${errorMsg}`);
 }
 
 /**
@@ -57,7 +55,7 @@ export async function waitForLoadState(
 	session: BiDiSession,
 	contextId: string,
 	state: 'load' | 'domcontentloaded' = 'load',
-	timeout: number = 30_000,
+	timeout = 30_000,
 ): Promise<void> {
 	// Check if already loaded by evaluating document.readyState
 	const result = await session.script.evaluate({
@@ -68,7 +66,10 @@ export async function waitForLoadState(
 
 	if (result.type === 'success' && result.result) {
 		const readyState = (result.result as { value?: string }).value;
-		if (state === 'domcontentloaded' && (readyState === 'interactive' || readyState === 'complete')) {
+		if (
+			state === 'domcontentloaded' &&
+			(readyState === 'interactive' || readyState === 'complete')
+		) {
 			return;
 		}
 		if (state === 'load' && readyState === 'complete') {
@@ -77,9 +78,7 @@ export async function waitForLoadState(
 	}
 
 	// Subscribe and wait for the event
-	const eventName = state === 'load'
-		? 'browsingContext.load'
-		: 'browsingContext.domContentLoaded';
+	const eventName = state === 'load' ? 'browsingContext.load' : 'browsingContext.domContentLoaded';
 
 	await session.subscribe([eventName], [contextId]);
 

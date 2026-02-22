@@ -74,9 +74,10 @@ async function testBiDiSession() {
 			target: { context: contextId },
 			awaitPromise: false,
 		});
-		const title = titleResult.type === 'success' && titleResult.result?.type === 'string'
-			? titleResult.result.value
-			: null;
+		const title =
+			titleResult.type === 'success' && titleResult.result?.type === 'string'
+				? titleResult.result.value
+				: null;
 		assertEq(title, 'Example Domain', `document.title = "${title}"`);
 
 		// Evaluate document.querySelector('h1').textContent
@@ -85,16 +86,20 @@ async function testBiDiSession() {
 			target: { context: contextId },
 			awaitPromise: false,
 		});
-		const h1 = h1Result.type === 'success' && h1Result.result?.type === 'string'
-			? h1Result.result.value
-			: null;
+		const h1 =
+			h1Result.type === 'success' && h1Result.result?.type === 'string'
+				? h1Result.result.value
+				: null;
 		assertEq(h1, 'Example Domain', `h1 text = "${h1}"`);
 
 		// Take a screenshot
 		const ssResult = await session.browsingContext.captureScreenshot({
 			context: contextId,
 		});
-		assert(ssResult.data && ssResult.data.length > 100, `Screenshot captured (${ssResult.data.length} chars base64)`);
+		assert(
+			ssResult.data && ssResult.data.length > 100,
+			`Screenshot captured (${ssResult.data.length} chars base64)`,
+		);
 
 		// Get the browsing context tree
 		const tree = await session.browsingContext.getTree();
@@ -103,7 +108,6 @@ async function testBiDiSession() {
 		// Close the browsing context
 		await session.browsingContext.close({ context: contextId });
 		assert(true, 'Closed browsing context');
-
 	} catch (err) {
 		console.log(`  ${FAIL} BiDiSession test threw: ${err.message}`);
 		if (err.stack) console.log(`    ${err.stack.split('\n').slice(1, 3).join('\n    ')}`);
@@ -179,7 +183,6 @@ async function testBrowserAPI() {
 		// Close the page
 		await page.close();
 		assert(true, 'page.close() succeeded');
-
 	} catch (err) {
 		console.log(`  ${FAIL} Browser API test threw: ${err.message}`);
 		if (err.stack) console.log(`    ${err.stack.split('\n').slice(1, 3).join('\n    ')}`);
@@ -209,7 +212,10 @@ async function testMultiplePages() {
 		// Create two pages
 		const page1 = await browser.newPage();
 		const page2 = await browser.newPage();
-		assert(browser.openPages.length === 2, `browser.openPages.length = ${browser.openPages.length}`);
+		assert(
+			browser.openPages.length === 2,
+			`browser.openPages.length = ${browser.openPages.length}`,
+		);
 
 		// Navigate to different pages
 		await page1.goto('https://example.com');
@@ -230,7 +236,6 @@ async function testMultiplePages() {
 
 		await page2.close();
 		assert(true, 'Closed page 2');
-
 	} catch (err) {
 		console.log(`  ${FAIL} Multiple pages test threw: ${err.message}`);
 		if (err.stack) console.log(`    ${err.stack.split('\n').slice(1, 3).join('\n    ')}`);
@@ -313,7 +318,9 @@ async function main() {
 	const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
 	console.log(`\n${BOLD}============================================${RESET}`);
-	console.log(`  ${PASS} ${passed} passed    ${failed > 0 ? FAIL : ''} ${failed} failed    (${elapsed}s)`);
+	console.log(
+		`  ${PASS} ${passed} passed    ${failed > 0 ? FAIL : ''} ${failed} failed    (${elapsed}s)`,
+	);
 	console.log(`${BOLD}============================================${RESET}\n`);
 
 	if (failed > 0) {

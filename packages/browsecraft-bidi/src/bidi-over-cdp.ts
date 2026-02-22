@@ -56,9 +56,7 @@ export async function connectBidiOverCdp(
 
 	// 3. Deep import the concrete MapperCdpConnection class
 	//    (BidiMapper only exports it as a type, not the class itself)
-	const cdpConnectionModule = (await import(
-		'chromium-bidi/lib/cjs/cdp/CdpConnection.js'
-	)) as any;
+	const cdpConnectionModule = (await import('chromium-bidi/lib/cjs/cdp/CdpConnection.js')) as any;
 	const MapperCdpConnection = cdpConnectionModule.MapperCdpConnection;
 
 	// 4. Create the raw CDP transport (string-based, wraps our WebSocket)
@@ -100,22 +98,17 @@ export async function connectBidiOverCdp(
 	//    - setOnMessage handler receives ChromiumBidi.Command objects
 	//    - sendMessage receives ChromiumBidi.Message objects (responses/events)
 	let bidiMessageHandler: ((message: string) => void) | null = null;
-	let incomingCommandHandler:
-		| ((message: unknown) => Promise<void> | void)
-		| null = null;
+	let incomingCommandHandler: ((message: unknown) => Promise<void> | void) | null = null;
 
 	const bidiTransport = {
-		setOnMessage(
-			handler: (message: unknown) => Promise<void> | void,
-		) {
+		setOnMessage(handler: (message: unknown) => Promise<void> | void) {
 			// BidiServer registers this handler to receive incoming BiDi commands
 			incomingCommandHandler = handler;
 		},
 		sendMessage(message: unknown) {
 			// BidiServer calls this with BiDi responses/events as parsed objects
 			// We convert to JSON string for our Transport class
-			const msgStr =
-				typeof message === 'string' ? message : JSON.stringify(message);
+			const msgStr = typeof message === 'string' ? message : JSON.stringify(message);
 			bidiMessageHandler?.(msgStr);
 		},
 		close() {

@@ -1,33 +1,41 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-  "organizeImports": {
-    "enabled": true
-  },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true,
-      "complexity": {
-        "noForEach": "off"
-      },
-      "suspicious": {
-        "noExplicitAny": "warn"
-      }
-    }
-  },
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "tab",
-    "lineWidth": 100
-  },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "single",
-      "semicolons": "always",
-      "trailingCommas": "all"
-    }
-  },
-  "files": {
-    "ignore": ["node_modules", "dist", "*.d.ts"]
-  }
+	"$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+	"organizeImports": {
+		"enabled": true
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"complexity": {
+				"noForEach": "off",
+				"noBannedTypes": "off"
+			},
+			"style": {
+				"noNonNullAssertion": "off",
+				"noUnusedTemplateLiteral": "warn",
+				"noParameterAssign": "off"
+			},
+			"suspicious": {
+				"noExplicitAny": "warn",
+				"noAssignInExpressions": "off",
+				"noThenProperty": "off"
+			}
+		}
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"lineWidth": 100
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "single",
+			"semicolons": "always",
+			"trailingCommas": "all"
+		}
+	},
+	"files": {
+		"ignore": ["node_modules", "dist", ".turbo", "*.d.ts", "pnpm-lock.yaml"]
+	}
 }

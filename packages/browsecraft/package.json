@@ -1,73 +1,70 @@
 {
-  "name": "browsecraft",
-  "version": "0.1.2",
-  "description": "AI-native browser automation framework. Craft browser tests that just work.",
-  "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    }
-  },
-  "files": [
-    "dist",
-    "LICENSE"
-  ],
-  "bin": {
-    "browsecraft": "./dist/cli.js"
-  },
-  "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "clean": "rimraf dist",
-    "prepublishOnly": "npm run build"
-  },
-  "sideEffects": false,
-  "publishConfig": {
-    "access": "public"
-  },
-  "dependencies": {
-    "browsecraft-bidi": "workspace:*",
-    "browsecraft-bdd": "workspace:*",
-    "browsecraft-runner": "workspace:*"
-  },
-  "devDependencies": {
-    "@types/node": "^22.10.0",
-    "tsup": "^8.3.5",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.0",
-    "rimraf": "^6.0.1"
-  },
-  "keywords": [
-    "browser",
-    "testing",
-    "automation",
-    "e2e",
-    "webdriver",
-    "bidi",
-    "ai",
-    "self-healing",
-    "playwright-alternative",
-    "cypress-alternative"
-  ],
-  "license": "MIT",
-  "author": "Browsecraft Contributors",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rik9564/browsecraft.git",
-    "directory": "packages/browsecraft"
-  },
-  "homepage": "https://github.com/rik9564/browsecraft#readme",
-  "bugs": {
-    "url": "https://github.com/rik9564/browsecraft/issues"
-  },
-  "engines": {
-    "node": ">=20.0.0"
-  }
+	"name": "browsecraft",
+	"version": "0.1.2",
+	"description": "AI-native browser automation framework. Craft browser tests that just work.",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": ["dist", "LICENSE"],
+	"bin": {
+		"browsecraft": "./dist/cli.js"
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"clean": "rimraf dist",
+		"prepublishOnly": "npm run build"
+	},
+	"sideEffects": false,
+	"publishConfig": {
+		"access": "public"
+	},
+	"dependencies": {
+		"browsecraft-bidi": "workspace:*",
+		"browsecraft-bdd": "workspace:*",
+		"browsecraft-runner": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^22.10.0",
+		"tsup": "^8.3.5",
+		"typescript": "^5.7.2",
+		"vitest": "^2.1.0",
+		"rimraf": "^6.0.1"
+	},
+	"keywords": [
+		"browser",
+		"testing",
+		"automation",
+		"e2e",
+		"webdriver",
+		"bidi",
+		"ai",
+		"self-healing",
+		"playwright-alternative",
+		"cypress-alternative"
+	],
+	"license": "MIT",
+	"author": "Browsecraft Contributors",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/rik9564/browsecraft.git",
+		"directory": "packages/browsecraft"
+	},
+	"homepage": "https://github.com/rik9564/browsecraft#readme",
+	"bugs": {
+		"url": "https://github.com/rik9564/browsecraft/issues"
+	},
+	"engines": {
+		"node": ">=20.0.0"
+	}
 }

@@ -22,10 +22,7 @@
 // ============================================================================
 
 import { Browser } from 'browsecraft';
-import {
-	feature, scenario, given, when, then, and, but,
-	runFeatures,
-} from 'browsecraft-bdd';
+import { and, but, feature, given, runFeatures, scenario, then, when } from 'browsecraft-bdd';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -65,7 +62,6 @@ async function login(page, username = 'standard_user') {
 // ---------------------------------------------------------------------------
 
 feature(['@saucelabs'], 'Sauce Labs Login', () => {
-
 	scenario(['@smoke', '@login'], 'Successful login with standard user', ({ page }) => {
 		given('I am on the Swag Labs login page', async () => {
 			await page.goto(BASE_URL);
@@ -111,7 +107,6 @@ feature(['@saucelabs'], 'Sauce Labs Login', () => {
 			}
 		});
 	});
-
 });
 
 // ---------------------------------------------------------------------------
@@ -119,7 +114,6 @@ feature(['@saucelabs'], 'Sauce Labs Login', () => {
 // ---------------------------------------------------------------------------
 
 feature(['@saucelabs'], 'Sauce Labs Shopping Cart', () => {
-
 	scenario(['@smoke', '@cart'], 'Add item to cart', ({ page }) => {
 		given('I am logged in', async () => {
 			await login(page);
@@ -167,7 +161,6 @@ feature(['@saucelabs'], 'Sauce Labs Shopping Cart', () => {
 			}
 		});
 	});
-
 });
 
 // ---------------------------------------------------------------------------
@@ -175,7 +168,6 @@ feature(['@saucelabs'], 'Sauce Labs Shopping Cart', () => {
 // ---------------------------------------------------------------------------
 
 feature(['@saucelabs'], 'Sauce Labs Checkout', () => {
-
 	scenario(['@smoke', '@checkout'], 'Complete checkout flow', ({ page }) => {
 		given('I am logged in with an item in my cart', async () => {
 			await login(page);
@@ -237,7 +229,6 @@ feature(['@saucelabs'], 'Sauce Labs Checkout', () => {
 			}
 		});
 	});
-
 });
 
 // ---------------------------------------------------------------------------
@@ -310,17 +301,21 @@ async function main() {
 		for (const feat of result.features) {
 			console.log(`  ${BOLD}Feature: ${feat.name}${RESET}`);
 			for (const sc of feat.scenarios) {
-				const scenarioIcon = sc.status === 'passed' ? PASS
-					: sc.status === 'failed' ? FAIL
-					: SKIP;
+				const scenarioIcon = sc.status === 'passed' ? PASS : sc.status === 'failed' ? FAIL : SKIP;
 				console.log(`    ${scenarioIcon} ${sc.name} ${DIM}(${sc.duration}ms)${RESET}`);
 
 				for (const step of sc.steps) {
-					const stepIcon = step.status === 'passed' ? PASS
-						: step.status === 'failed' ? FAIL
-						: step.status === 'skipped' ? SKIP
-						: SKIP;
-					console.log(`      ${stepIcon} ${step.keyword} ${step.text} ${DIM}(${step.duration}ms)${RESET}`);
+					const stepIcon =
+						step.status === 'passed'
+							? PASS
+							: step.status === 'failed'
+								? FAIL
+								: step.status === 'skipped'
+									? SKIP
+									: SKIP;
+					console.log(
+						`      ${stepIcon} ${step.keyword} ${step.text} ${DIM}(${step.duration}ms)${RESET}`,
+					);
 					if (step.error) {
 						console.log(`        ${RED}${step.error.message.split('\n')[0]}${RESET}`);
 					}
@@ -332,9 +327,15 @@ async function main() {
 		// Summary
 		const { summary } = result;
 		console.log(`${BOLD}============================================${RESET}`);
-		console.log(`  Features:  ${summary.features.passed} passed, ${summary.features.failed} failed, ${summary.features.total} total`);
-		console.log(`  Scenarios: ${GREEN}${summary.scenarios.passed} passed${RESET}, ${RED}${summary.scenarios.failed} failed${RESET}, ${YELLOW}${summary.scenarios.skipped} skipped${RESET}, ${summary.scenarios.total} total`);
-		console.log(`  Steps:     ${GREEN}${summary.steps.passed} passed${RESET}, ${RED}${summary.steps.failed} failed${RESET}, ${YELLOW}${summary.steps.skipped} skipped${RESET}, ${summary.steps.total} total`);
+		console.log(
+			`  Features:  ${summary.features.passed} passed, ${summary.features.failed} failed, ${summary.features.total} total`,
+		);
+		console.log(
+			`  Scenarios: ${GREEN}${summary.scenarios.passed} passed${RESET}, ${RED}${summary.scenarios.failed} failed${RESET}, ${YELLOW}${summary.scenarios.skipped} skipped${RESET}, ${summary.scenarios.total} total`,
+		);
+		console.log(
+			`  Steps:     ${GREEN}${summary.steps.passed} passed${RESET}, ${RED}${summary.steps.failed} failed${RESET}, ${YELLOW}${summary.steps.skipped} skipped${RESET}, ${summary.steps.total} total`,
+		);
 		console.log(`  Duration:  ${(result.duration / 1000).toFixed(1)}s`);
 		console.log(`${BOLD}============================================${RESET}\n`);
 

@@ -16,32 +16,32 @@
 // ============================================================================
 
 import type {
-	GherkinDocument,
+	Background,
+	DocString,
+	Examples,
 	Feature,
+	FeatureChild,
+	DataTable as GherkinDataTable,
+	GherkinDocument,
+	Rule,
+	RuleChild,
 	Scenario,
 	Step,
-	Background,
-	Examples,
 	Tag,
-	FeatureChild,
-	RuleChild,
-	Rule,
-	DataTable as GherkinDataTable,
-	DocString,
 } from './gherkin-parser.js';
 
 import {
-	type StepMatch,
-	type StepWorld,
-	type StepType,
-	type StepRegistry,
 	BrowsecraftDataTable,
-	globalRegistry,
+	type StepMatch,
+	type StepRegistry,
+	type StepType,
+	type StepWorld,
 	escapeRegex,
+	globalRegistry,
 } from './step-registry.js';
 
-import { type HookRegistry, type HookContext, globalHookRegistry } from './hooks.js';
-import { evaluateTagExpression, parseTagExpression, type TagExpression } from './tags.js';
+import { type HookContext, type HookRegistry, globalHookRegistry } from './hooks.js';
+import { type TagExpression, evaluateTagExpression, parseTagExpression } from './tags.js';
 
 // ---------------------------------------------------------------------------
 // Result Types
@@ -118,7 +118,14 @@ export interface RunResult {
 	summary: {
 		features: { total: number; passed: number; failed: number; skipped: number };
 		scenarios: { total: number; passed: number; failed: number; skipped: number; pending: number };
-		steps: { total: number; passed: number; failed: number; skipped: number; pending: number; undefined: number };
+		steps: {
+			total: number;
+			passed: number;
+			failed: number;
+			skipped: number;
+			pending: number;
+			undefined: number;
+		};
 	};
 }
 
@@ -190,9 +197,7 @@ export class BddExecutor {
 			dryRun: false,
 			...options,
 		};
-		this.tagFilter = options.tagFilter
-			? parseTagExpression(options.tagFilter)
-			: null;
+		this.tagFilter = options.tagFilter ? parseTagExpression(options.tagFilter) : null;
 	}
 
 	/**
@@ -359,14 +364,16 @@ export class BddExecutor {
 
 		// Check tag filter
 		if (this.tagFilter && !evaluateTagExpression(this.tagFilter, scenarioTags)) {
-			return [{
-				name: scenario.name,
-				status: 'skipped',
-				steps: [],
-				duration: 0,
-				tags: scenarioTags,
-				line: scenario.line,
-			}];
+			return [
+				{
+					name: scenario.name,
+					status: 'skipped',
+					steps: [],
+					duration: 0,
+					tags: scenarioTags,
+					line: scenario.line,
+				},
+			];
 		}
 
 		// Scenario Outline — expand Examples
@@ -414,9 +421,7 @@ export class BddExecutor {
 				}
 
 				// Expand <placeholder> in step texts
-				const expandedSteps = scenario.steps.map((step) =>
-					this.expandOutlineStep(step, values),
-				);
+				const expandedSteps = scenario.steps.map((step) => this.expandOutlineStep(step, values));
 
 				// Create a virtual scenario with expanded steps
 				const expandedScenario: Scenario = {
@@ -508,7 +513,7 @@ export class BddExecutor {
 
 			// Slow-mo delay between steps (for headed/visual debugging)
 			if (this.options.slowMo && this.options.slowMo > 0 && result.status === 'passed') {
-				await new Promise(r => setTimeout(r, this.options.slowMo));
+				await new Promise((r) => setTimeout(r, this.options.slowMo));
 			}
 
 			// Update effective keyword type
@@ -640,8 +645,7 @@ export class BddExecutor {
 				status: 'undefined',
 				duration: Date.now() - stepStart,
 				error: new Error(
-					`Undefined step: "${step.keyword} ${step.text}"\n` +
-					this.formatSuggestions(step.text),
+					`Undefined step: "${step.keyword} ${step.text}"\n${this.formatSuggestions(step.text)}`,
 				),
 				line: step.line,
 				attachments,
@@ -650,7 +654,11 @@ export class BddExecutor {
 
 			// Fire AfterStep hook
 			hookContext.error = result.error;
-			try { await this.hooks.runHooks('afterStep', hookContext); } catch { /* ignore */ }
+			try {
+				await this.hooks.runHooks('afterStep', hookContext);
+			} catch {
+				/* ignore */
+			}
 
 			this.options.onStepEnd?.(result, '');
 			return result;
@@ -675,9 +683,12 @@ export class BddExecutor {
 					stepPromise,
 					new Promise<never>((_, reject) =>
 						setTimeout(
-							() => reject(new Error(
-								`Step timed out after ${this.options.stepTimeout}ms: "${step.keyword} ${step.text}"`,
-							)),
+							() =>
+								reject(
+									new Error(
+										`Step timed out after ${this.options.stepTimeout}ms: "${step.keyword} ${step.text}"`,
+									),
+								),
 							this.options.stepTimeout,
 						),
 					),
@@ -695,7 +706,11 @@ export class BddExecutor {
 			};
 
 			// Fire AfterStep hook
-			try { await this.hooks.runHooks('afterStep', hookContext); } catch { /* ignore */ }
+			try {
+				await this.hooks.runHooks('afterStep', hookContext);
+			} catch {
+				/* ignore */
+			}
 
 			this.options.onStepEnd?.(result, '');
 			return result;
@@ -715,7 +730,11 @@ export class BddExecutor {
 				};
 
 				hookContext.error = error;
-				try { await this.hooks.runHooks('afterStep', hookContext); } catch { /* ignore */ }
+				try {
+					await this.hooks.runHooks('afterStep', hookContext);
+				} catch {
+					/* ignore */
+				}
 
 				this.options.onStepEnd?.(result, '');
 				return result;
@@ -733,7 +752,11 @@ export class BddExecutor {
 			};
 
 			hookContext.error = error;
-			try { await this.hooks.runHooks('afterStep', hookContext); } catch { /* ignore */ }
+			try {
+				await this.hooks.runHooks('afterStep', hookContext);
+			} catch {
+				/* ignore */
+			}
 
 			this.options.onStepEnd?.(result, '');
 			return result;
@@ -757,12 +780,8 @@ export class BddExecutor {
 		return {
 			...step,
 			text: this.expandPlaceholders(step.text, values),
-			dataTable: step.dataTable
-				? this.expandDataTable(step.dataTable, values)
-				: null,
-			docString: step.docString
-				? this.expandDocString(step.docString, values)
-				: null,
+			dataTable: step.dataTable ? this.expandDataTable(step.dataTable, values) : null,
+			docString: step.docString ? this.expandDocString(step.docString, values) : null,
 		};
 	}
 
@@ -774,7 +793,10 @@ export class BddExecutor {
 		return result;
 	}
 
-	private expandDataTable(table: GherkinDataTable, values: Record<string, string>): GherkinDataTable {
+	private expandDataTable(
+		table: GherkinDataTable,
+		values: Record<string, string>,
+	): GherkinDataTable {
 		return {
 			rows: table.rows.map((row) => ({
 				...row,
@@ -829,11 +851,21 @@ export function computeSummary(features: FeatureResult[]): RunResult['summary'] 
 			for (const st of s.steps) {
 				summary.steps.total++;
 				switch (st.status) {
-					case 'passed': summary.steps.passed++; break;
-					case 'failed': summary.steps.failed++; break;
-					case 'skipped': summary.steps.skipped++; break;
-					case 'pending': summary.steps.pending++; break;
-					case 'undefined': summary.steps.undefined++; break;
+					case 'passed':
+						summary.steps.passed++;
+						break;
+					case 'failed':
+						summary.steps.failed++;
+						break;
+					case 'skipped':
+						summary.steps.skipped++;
+						break;
+					case 'pending':
+						summary.steps.pending++;
+						break;
+					case 'undefined':
+						summary.steps.undefined++;
+						break;
 				}
 			}
 		}

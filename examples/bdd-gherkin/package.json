@@ -1,18 +1,18 @@
 {
-  "name": "browsecraft-example-bdd-gherkin",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "description": "BDD with .feature files — classic Gherkin + step definitions",
-  "scripts": {
-    "test": "node test.mjs",
-    "test:smoke": "node test.mjs --tags \"@smoke\"",
-    "test:login": "node test.mjs --tags \"@login\"",
-    "test:headed": "node test.mjs --headed",
-    "test:maximized": "node test.mjs --headed --maximized"
-  },
-  "dependencies": {
-    "browsecraft": "file:../../packages/browsecraft",
-    "browsecraft-bdd": "file:../../packages/browsecraft-bdd"
-  }
+	"name": "browsecraft-example-bdd-gherkin",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"description": "BDD with .feature files — classic Gherkin + step definitions",
+	"scripts": {
+		"test": "node test.mjs",
+		"test:smoke": "node test.mjs --tags \"@smoke\"",
+		"test:login": "node test.mjs --tags \"@login\"",
+		"test:headed": "node test.mjs --headed",
+		"test:maximized": "node test.mjs --headed --maximized"
+	},
+	"dependencies": {
+		"browsecraft": "file:../../packages/browsecraft",
+		"browsecraft-bdd": "file:../../packages/browsecraft-bdd"
+	}
 }

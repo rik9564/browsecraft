@@ -7,7 +7,7 @@
 // expect(page.get('Cart')).toHaveText('3 items');
 // ============================================================================
 
-import type { Page, ElementHandle } from './page.js';
+import type { ElementHandle, Page } from './page.js';
 import { waitFor } from './wait.js';
 
 /** Default timeout for assertions (5s is plenty for UI checks) */
@@ -37,11 +37,15 @@ interface MatcherOptions {
 export function expect(subject: Page): PageAssertions;
 export function expect(subject: ElementHandle): ElementAssertions;
 export function expect(subject: Page | ElementHandle): PageAssertions | ElementAssertions {
-	if (subject instanceof (
-		// We can't import Page directly for instanceof due to circular deps,
-		// so we check for the contextId property which only Page has
-		Object
-	) && 'contextId' in subject && 'session' in subject && !('target' in subject)) {
+	if (
+		subject instanceof
+			// We can't import Page directly for instanceof due to circular deps,
+			// so we check for the contextId property which only Page has
+			Object &&
+		'contextId' in subject &&
+		'session' in subject &&
+		!('target' in subject)
+	) {
 		return new PageAssertions(subject as Page);
 	}
 	return new ElementAssertions(subject as ElementHandle);
@@ -85,9 +89,8 @@ class PageAssertions {
 			`URL to ${isNot ? 'not ' : ''}match ${expected}`,
 			async () => {
 				const actual = await this.page.url();
-				const matches = typeof expected === 'string'
-					? actual.includes(expected)
-					: expected.test(actual);
+				const matches =
+					typeof expected === 'string' ? actual.includes(expected) : expected.test(actual);
 				return isNot ? !matches : matches;
 			},
 			(pass) => {
@@ -116,9 +119,8 @@ class PageAssertions {
 			`title to ${isNot ? 'not ' : ''}match "${expected}"`,
 			async () => {
 				const actual = await this.page.title();
-				const matches = typeof expected === 'string'
-					? actual.includes(expected)
-					: expected.test(actual);
+				const matches =
+					typeof expected === 'string' ? actual.includes(expected) : expected.test(actual);
 				return isNot ? !matches : matches;
 			},
 			(pass) => {
@@ -149,9 +151,8 @@ class PageAssertions {
 			async () => {
 				const content = await this.page.evaluate<string>('document.body?.innerText || ""');
 				lastContent = content.slice(0, 200); // keep for error message
-				const matches = typeof expected === 'string'
-					? content.includes(expected)
-					: expected.test(content);
+				const matches =
+					typeof expected === 'string' ? content.includes(expected) : expected.test(content);
 				return isNot ? !matches : matches;
 			},
 			(pass) => {
@@ -261,9 +262,7 @@ class ElementAssertions {
 			async () => {
 				const actual = (await this.element.textContent()).trim();
 				lastActual = actual;
-				const matches = typeof expected === 'string'
-					? actual === expected
-					: expected.test(actual);
+				const matches = typeof expected === 'string' ? actual === expected : expected.test(actual);
 				return isNot ? !matches : matches;
 			},
 			(pass) => {
@@ -293,9 +292,8 @@ class ElementAssertions {
 			async () => {
 				const actual = (await this.element.textContent()).trim();
 				lastActual = actual;
-				const matches = typeof expected === 'string'
-					? actual.includes(expected)
-					: expected.test(actual);
+				const matches =
+					typeof expected === 'string' ? actual.includes(expected) : expected.test(actual);
 				return isNot ? !matches : matches;
 			},
 			(pass) => {
@@ -346,7 +344,11 @@ class ElementAssertions {
 	 * await expect(page.get('a')).toHaveAttribute('href', /login/);
 	 * ```
 	 */
-	async toHaveAttribute(name: string, expected?: string | RegExp, options?: MatcherOptions): Promise<void> {
+	async toHaveAttribute(
+		name: string,
+		expected?: string | RegExp,
+		options?: MatcherOptions,
+	): Promise<void> {
 		const timeout = options?.timeout ?? DEFAULT_ASSERTION_TIMEOUT;
 		const isNot = this._not;
 		let lastValue: string | null = null;
@@ -367,9 +369,7 @@ class ElementAssertions {
 					return isNot; // no value -- pass if negated, fail otherwise
 				}
 
-				const matches = typeof expected === 'string'
-					? value === expected
-					: expected.test(value);
+				const matches = typeof expected === 'string' ? value === expected : expected.test(value);
 				return isNot ? !matches : matches;
 			},
 			(pass) => {
@@ -415,14 +415,13 @@ class ElementAssertions {
 					awaitPromise: false,
 				});
 
-				const value = result.type === 'success' && result.result?.type === 'string'
-					? (result.result as { value: string }).value
-					: '';
+				const value =
+					result.type === 'success' && result.result?.type === 'string'
+						? (result.result as { value: string }).value
+						: '';
 				lastValue = value;
 
-				const matches = typeof expected === 'string'
-					? value === expected
-					: expected.test(value);
+				const matches = typeof expected === 'string' ? value === expected : expected.test(value);
 				return isNot ? !matches : matches;
 			},
 			(pass) => {
@@ -464,7 +463,8 @@ class ElementAssertions {
 					awaitPromise: false,
 				});
 
-				const checked = result.type === 'success' &&
+				const checked =
+					result.type === 'success' &&
 					result.result?.type === 'boolean' &&
 					(result.result as { value: boolean }).value === true;
 				return isNot ? !checked : checked;
@@ -507,7 +507,8 @@ class ElementAssertions {
 					awaitPromise: false,
 				});
 
-				const enabled = result.type === 'success' &&
+				const enabled =
+					result.type === 'success' &&
 					result.result?.type === 'boolean' &&
 					(result.result as { value: boolean }).value === true;
 				return isNot ? !enabled : enabled;
@@ -550,7 +551,8 @@ class ElementAssertions {
 					awaitPromise: false,
 				});
 
-				const disabled = result.type === 'success' &&
+				const disabled =
+					result.type === 'success' &&
 					result.result?.type === 'boolean' &&
 					(result.result as { value: boolean }).value === true;
 				return isNot ? !disabled : disabled;
@@ -580,12 +582,13 @@ class ElementAssertions {
 		await retry(
 			`element to ${isNot ? 'not ' : ''}have class "${expected}"`,
 			async () => {
-				const classes = await this.element.getAttribute('class') ?? '';
+				const classes = (await this.element.getAttribute('class')) ?? '';
 				lastClasses = classes;
 
-				const matches = typeof expected === 'string'
-					? classes.split(/\s+/).includes(expected)
-					: expected.test(classes);
+				const matches =
+					typeof expected === 'string'
+						? classes.split(/\s+/).includes(expected)
+						: expected.test(classes);
 				return isNot ? !matches : matches;
 			},
 			(pass) => {
@@ -606,7 +609,11 @@ class ElementAssertions {
 	 * await expect(page.get('.box')).toHaveCSS('display', 'flex');
 	 * ```
 	 */
-	async toHaveCSS(property: string, expected: string | RegExp, options?: MatcherOptions): Promise<void> {
+	async toHaveCSS(
+		property: string,
+		expected: string | RegExp,
+		options?: MatcherOptions,
+	): Promise<void> {
 		const timeout = options?.timeout ?? DEFAULT_ASSERTION_TIMEOUT;
 		const isNot = this._not;
 		let lastValue = '';
@@ -622,20 +629,20 @@ class ElementAssertions {
 				if (!ref) return false;
 
 				const result = await this.element.page.session.script.callFunction({
-					functionDeclaration: `function(el, prop) { return window.getComputedStyle(el).getPropertyValue(prop); }`,
+					functionDeclaration:
+						'function(el, prop) { return window.getComputedStyle(el).getPropertyValue(prop); }',
 					target: { context: this.element.page.contextId },
 					arguments: [ref, { type: 'string', value: property }],
 					awaitPromise: false,
 				});
 
-				const value = result.type === 'success' && result.result?.type === 'string'
-					? (result.result as { value: string }).value
-					: '';
+				const value =
+					result.type === 'success' && result.result?.type === 'string'
+						? (result.result as { value: string }).value
+						: '';
 				lastValue = value;
 
-				const matches = typeof expected === 'string'
-					? value === expected
-					: expected.test(value);
+				const matches = typeof expected === 'string' ? value === expected : expected.test(value);
 				return isNot ? !matches : matches;
 			},
 			(pass) => {
@@ -698,9 +705,8 @@ class ElementAssertions {
 
 				if (placeholder === null) return isNot;
 
-				const matches = typeof expected === 'string'
-					? placeholder === expected
-					: expected.test(placeholder);
+				const matches =
+					typeof expected === 'string' ? placeholder === expected : expected.test(placeholder);
 				return isNot ? !matches : matches;
 			},
 			(pass) => {
@@ -745,9 +751,10 @@ class ElementAssertions {
 					awaitPromise: false,
 				});
 
-				const role = result.type === 'success' && result.result?.type === 'string'
-					? (result.result as { value: string }).value
-					: '';
+				const role =
+					result.type === 'success' && result.result?.type === 'string'
+						? (result.result as { value: string }).value
+						: '';
 				lastRole = role;
 
 				const matches = role === expected;
@@ -814,8 +821,4 @@ async function retry(
  */
 export class AssertionError extends Error {
 	readonly name = 'AssertionError';
-
-	constructor(message: string) {
-		super(message);
-	}
 }

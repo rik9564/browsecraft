@@ -4,7 +4,7 @@
 // Zero config -- auto-detects installed browsers on Windows, Mac, Linux.
 // ============================================================================
 
-import { spawn, type ChildProcess } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -52,11 +52,7 @@ export interface LaunchResult {
  * ```
  */
 export async function launchBrowser(options: LaunchOptions = {}): Promise<LaunchResult> {
-	const {
-		browser = 'chrome',
-		headless = true,
-		timeout = 30_000,
-	} = options;
+	const { browser = 'chrome', headless = true, timeout = 30_000 } = options;
 
 	// Create a temporary user data dir so we get a clean profile every time
 	const userDataDir = await mkdtemp(join(tmpdir(), `browsecraft-${browser}-`));
@@ -65,11 +61,16 @@ export async function launchBrowser(options: LaunchOptions = {}): Promise<Launch
 	if (!executablePath) {
 		throw new Error(
 			`Could not find ${browser} on your system. ` +
-			`Install ${browser} or provide executablePath in options.`,
+				`Install ${browser} or provide executablePath in options.`,
 		);
 	}
 
-	const args = buildArgs(browser, { headless, userDataDir, maximized: options.maximized, extraArgs: options.args });
+	const args = buildArgs(browser, {
+		headless,
+		userDataDir,
+		maximized: options.maximized,
+		extraArgs: options.args,
+	});
 
 	const proc = spawn(executablePath, args, {
 		stdio: ['pipe', 'pipe', 'pipe'],
@@ -174,11 +175,7 @@ function getFirefoxPaths(platform: string): string[] {
 				`${process.env.HOME}/Applications/Firefox.app/Contents/MacOS/firefox`,
 			];
 		case 'linux':
-			return [
-				'/usr/bin/firefox',
-				'/usr/bin/firefox-esr',
-				'/snap/bin/firefox',
-			];
+			return ['/usr/bin/firefox', '/usr/bin/firefox-esr', '/snap/bin/firefox'];
 		default:
 			return [];
 	}
@@ -193,14 +190,9 @@ function getEdgePaths(platform: string): string[] {
 				`${process.env.LOCALAPPDATA}\\Microsoft\\Edge\\Application\\msedge.exe`,
 			];
 		case 'darwin':
-			return [
-				'/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-			];
+			return ['/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'];
 		case 'linux':
-			return [
-				'/usr/bin/microsoft-edge',
-				'/usr/bin/microsoft-edge-stable',
-			];
+			return ['/usr/bin/microsoft-edge', '/usr/bin/microsoft-edge-stable'];
 		default:
 			return [];
 	}
@@ -293,8 +285,10 @@ function buildChromiumArgs(options: BuildArgsOptions): string[] {
 
 function buildFirefoxArgs(options: BuildArgsOptions): string[] {
 	const args = [
-		'--remote-debugging-port', '0',
-		'-profile', options.userDataDir,
+		'--remote-debugging-port',
+		'0',
+		'-profile',
+		options.userDataDir,
 		'-no-remote',
 		'about:blank',
 	];
@@ -326,7 +320,7 @@ function waitForWSEndpoint(
 			reject(
 				new Error(
 					`Timed out after ${timeout}ms waiting for ${browser} to start.\n` +
-					`Stderr output:\n${stderr}`,
+						`Stderr output:\n${stderr}`,
 				),
 			);
 		}, timeout);
@@ -361,7 +355,7 @@ function waitForWSEndpoint(
 			reject(
 				new Error(
 					`${browser} exited with code ${code} before WebSocket endpoint was ready.\n` +
-					`Stderr:\n${stderr}`,
+						`Stderr:\n${stderr}`,
 				),
 			);
 		});
