@@ -1,7 +1,7 @@
 {
-  "name": "browsecraft",
+  "name": "browsecraft-bdd",
   "version": "0.1.0",
-  "description": "AI-native browser automation framework. Craft browser tests that just work.",
+  "description": "Built-in BDD support for Browsecraft — Gherkin parser, step definitions, AI auto-steps, and TypeScript-native BDD mode",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -14,9 +14,6 @@
     }
   },
   "files": ["dist"],
-  "bin": {
-    "browsecraft": "./dist/cli.js"
-  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -25,9 +22,7 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "browsecraft-bidi": "workspace:*",
-    "browsecraft-bdd": "workspace:*",
-    "browsecraft-runner": "workspace:*"
+    "browsecraft-ai": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -36,24 +31,12 @@
     "vitest": "^2.1.0",
     "rimraf": "^6.0.1"
   },
-  "keywords": [
-    "browser",
-    "testing",
-    "automation",
-    "e2e",
-    "webdriver",
-    "bidi",
-    "ai",
-    "self-healing",
-    "playwright-alternative",
-    "cypress-alternative"
-  ],
   "license": "MIT",
   "author": "Browsecraft Contributors",
   "repository": {
     "type": "git",
     "url": "https://github.com/AchilleasCH/browsecraft.git",
-    "directory": "packages/browsecraft"
+    "directory": "packages/browsecraft-bdd"
   },
   "homepage": "https://github.com/AchilleasCH/browsecraft#readme",
   "bugs": {
@@ -61,5 +44,15 @@
   },
   "engines": {
     "node": ">=20.0.0"
-  }
+  },
+  "keywords": [
+    "browsecraft",
+    "bdd",
+    "gherkin",
+    "cucumber",
+    "behavior-driven-development",
+    "step-definitions",
+    "feature-files",
+    "testing"
+  ]
 }
