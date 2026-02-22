@@ -14,7 +14,8 @@ import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { TestRunner, type RunnerOptions, type RunnableTest } from 'browsecraft-runner';
 import { resolveConfig, type UserConfig } from './config.js';
-import { testRegistry, runTest, type TestCase } from './test.js';
+import { testRegistry, runTest, runAfterAllHooks, type TestCase } from './test.js';
+import { Browser } from './browser.js';
 
 const VERSION = '0.1.0';
 
@@ -99,6 +100,12 @@ async function runTests(args: string[]) {
 	// loadFile callback: imports the test file and returns registered tests
 	const loadFile = async (file: string): Promise<RunnableTest[]> => {
 		const startIdx = testRegistry.length;
+
+		// For TypeScript files, register a TypeScript loader if available
+		if (file.endsWith('.ts') || file.endsWith('.mts')) {
+			await ensureTypeScriptLoader();
+		}
+
 		const fileUrl = pathToFileURL(file).href;
 		await import(fileUrl);
 		return testRegistry.slice(startIdx).map(tc => ({
@@ -111,13 +118,35 @@ async function runTests(args: string[]) {
 		}));
 	};
 
+	// Launch a shared browser for all tests
+	let sharedBrowser: Browser | undefined;
+
+	try {
+		sharedBrowser = await Browser.launch({
+			browser: config.browser,
+			headless: config.headless,
+			executablePath: config.executablePath,
+			debug: config.debug,
+			timeout: config.timeout,
+		});
+	} catch (err) {
+		console.error(`Failed to launch browser: ${err instanceof Error ? err.message : String(err)}`);
+		process.exit(1);
+	}
+
 	// executeTest callback: runs a single test with fixture setup/teardown
 	const executeTest = async (test: RunnableTest) => {
-		return runTest(test as unknown as TestCase);
+		return runTest(test as unknown as TestCase, sharedBrowser);
 	};
 
-	const exitCode = await runner.run(loadFile, executeTest);
-	process.exit(exitCode);
+	try {
+		const exitCode = await runner.run(loadFile, executeTest);
+		await sharedBrowser.close().catch(() => {});
+		process.exit(exitCode);
+	} catch (err) {
+		await sharedBrowser?.close().catch(() => {});
+		throw err;
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -224,6 +253,58 @@ async function loadConfig(): Promise<UserConfig | undefined> {
 	}
 
 	return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// TypeScript Loader
+// ---------------------------------------------------------------------------
+
+let tsLoaderRegistered = false;
+
+/**
+ * Ensure a TypeScript loader is registered so that .ts test files can be imported.
+ * Tries tsx first (fastest), then ts-node, then falls back to a helpful error.
+ */
+async function ensureTypeScriptLoader(): Promise<void> {
+	if (tsLoaderRegistered) return;
+
+	// Check if we're already running under a TS loader (e.g., `tsx`, `ts-node`, `bun`)
+	// In that case, .ts imports already work
+	const execArgs = process.execArgv.join(' ');
+	if (
+		execArgs.includes('tsx') ||
+		execArgs.includes('ts-node') ||
+		execArgs.includes('loader') ||
+		process.versions.bun // Bun handles TS natively
+	) {
+		tsLoaderRegistered = true;
+		return;
+	}
+
+	// Try to dynamically register tsx or ts-node
+	for (const loader of ['tsx/esm', 'ts-node/esm']) {
+		try {
+			// Node 20.6+ supports module.register()
+			const { register } = await import('node:module');
+			if (typeof register === 'function') {
+				register(loader, pathToFileURL('./'));
+				tsLoaderRegistered = true;
+				return;
+			}
+		} catch {
+			// Loader not available, try next
+		}
+	}
+
+	// If neither tsx nor ts-node is available, give a helpful error
+	console.error(
+		'\n  Error: Cannot import TypeScript test files.\n' +
+		'  Install tsx (recommended) or ts-node:\n\n' +
+		'    npm install -D tsx\n\n' +
+		'  Or run browsecraft with tsx:\n\n' +
+		'    npx tsx node_modules/.bin/browsecraft test\n',
+	);
+	process.exit(1);
 }
 
 // ---------------------------------------------------------------------------

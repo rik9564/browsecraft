@@ -175,6 +175,16 @@ export interface BrowsingContextHandleUserPromptParams {
 	userText?: string;
 }
 
+export interface BrowsingContextTraverseHistoryParams {
+	context: string;
+	/** Positive goes forward, negative goes back */
+	delta: number;
+}
+
+export interface BrowsingContextTraverseHistoryResult {
+	// Empty result on success
+}
+
 // ---------------------------------------------------------------------------
 // Locator types - how BiDi finds elements
 // ---------------------------------------------------------------------------
@@ -644,6 +654,31 @@ export interface StorageSetCookieParams {
 export interface StorageDeleteCookiesParams {
 	filter?: CookieFilter;
 	partition?: StoragePartition;
+}
+
+export interface StorageCookie {
+	name: string;
+	value: NetworkStringValue | NetworkBytesValue;
+	domain: string;
+	path: string;
+	size: number;
+	httpOnly: boolean;
+	secure: boolean;
+	sameSite: 'strict' | 'lax' | 'none';
+	expiry?: number;
+}
+
+export interface StorageGetCookiesResult {
+	cookies: StorageCookie[];
+	partitionKey: Record<string, unknown>;
+}
+
+export interface StorageSetCookieResult {
+	partitionKey: Record<string, unknown>;
+}
+
+export interface StorageDeleteCookiesResult {
+	partitionKey: Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------

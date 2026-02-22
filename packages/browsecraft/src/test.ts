@@ -15,7 +15,10 @@
 
 import { Browser, BrowserContext } from './browser.js';
 import { Page } from './page.js';
+import { resolveConfig } from './config.js';
 import type { UserConfig } from './config.js';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,6 +67,12 @@ export const testRegistry: TestCase[] = [];
 
 /** Current suite stack for describe() nesting */
 const suiteStack: string[] = [];
+
+/** Track which beforeAll hooks have already been executed */
+const executedBeforeAllHooks = new Set<string>();
+
+/** Track which afterAll hooks have already been executed */
+const executedAfterAllHooks = new Set<string>();
 
 // ---------------------------------------------------------------------------
 // test() -- the main API
@@ -251,8 +260,10 @@ export function getHooks() {
 export async function runTest(
 	testCase: TestCase,
 	sharedBrowser?: Browser,
+	userConfig?: UserConfig,
 ): Promise<TestResult> {
 	const startTime = Date.now();
+	const config = resolveConfig(userConfig);
 
 	if (testCase.skip) {
 		return {
@@ -275,6 +286,18 @@ export async function runTest(
 
 		const fixtures: TestFixtures = { page, context, browser };
 
+		// Run beforeAll hooks (only for hooks that haven't been run yet for this suite)
+		const applicableBeforeAll = hooks.beforeAll.filter(h =>
+			isHookApplicable(h.suitePath, testCase.suitePath),
+		);
+		for (const hook of applicableBeforeAll) {
+			const hookKey = `${hook.suitePath.join('>')}:${hooks.beforeAll.indexOf(hook)}`;
+			if (!executedBeforeAllHooks.has(hookKey)) {
+				await hook.fn(fixtures);
+				executedBeforeAllHooks.add(hookKey);
+			}
+		}
+
 		// Run beforeEach hooks
 		const applicableBeforeEach = hooks.beforeEach.filter(h =>
 			isHookApplicable(h.suitePath, testCase.suitePath),
@@ -284,7 +307,7 @@ export async function runTest(
 		}
 
 		// Run the test
-		const timeout = testCase.options.timeout ?? 30_000;
+		const timeout = testCase.options.timeout ?? config.timeout;
 		await Promise.race([
 			testCase.fn(fixtures),
 			new Promise<never>((_, reject) =>
@@ -300,21 +323,36 @@ export async function runTest(
 			await hook.fn(fixtures);
 		}
 
+		// Take screenshot on success if config says 'always'
+		let screenshotPath: string | undefined;
+		if (config.screenshot === 'always' && page) {
+			screenshotPath = await captureScreenshot(page, testCase, config.outputDir).catch(() => undefined);
+		}
+
 		const duration = Date.now() - startTime;
 		return {
 			title: testCase.title,
 			suitePath: testCase.suitePath,
 			status: 'passed',
 			duration,
+			screenshotPath,
 		};
 	} catch (error) {
 		const duration = Date.now() - startTime;
+
+		// Capture screenshot on failure if configured
+		let screenshotPath: string | undefined;
+		if ((config.screenshot === 'on-failure' || config.screenshot === 'always') && page) {
+			screenshotPath = await captureScreenshot(page, testCase, config.outputDir).catch(() => undefined);
+		}
+
 		return {
 			title: testCase.title,
 			suitePath: testCase.suitePath,
 			status: 'failed',
 			duration,
 			error: error instanceof Error ? error : new Error(String(error)),
+			screenshotPath,
 		};
 	} finally {
 		// Clean up context (page is closed when context closes)
@@ -326,11 +364,69 @@ export async function runTest(
 	}
 }
 
+/**
+ * Run afterAll hooks for the given suite path.
+ * Called by the runner after all tests in a suite have completed.
+ */
+export async function runAfterAllHooks(
+	suitePath: string[],
+	fixtures: TestFixtures,
+): Promise<void> {
+	const applicableAfterAll = hooks.afterAll.filter(h =>
+		isHookApplicable(h.suitePath, suitePath),
+	);
+	for (const hook of applicableAfterAll) {
+		const hookKey = `${hook.suitePath.join('>')}:${hooks.afterAll.indexOf(hook)}`;
+		if (!executedAfterAllHooks.has(hookKey)) {
+			await hook.fn(fixtures);
+			executedAfterAllHooks.add(hookKey);
+		}
+	}
+}
+
+/**
+ * Reset all hooks and registries (for test isolation between files).
+ */
+export function resetTestState(): void {
+	testRegistry.length = 0;
+	hooks.beforeAll.length = 0;
+	hooks.afterAll.length = 0;
+	hooks.beforeEach.length = 0;
+	hooks.afterEach.length = 0;
+	executedBeforeAllHooks.clear();
+	executedAfterAllHooks.clear();
+	suiteStack.length = 0;
+}
+
 /** Check if a hook applies to a test based on suite nesting */
 function isHookApplicable(hookSuitePath: string[], testSuitePath: string[]): boolean {
 	if (hookSuitePath.length === 0) return true; // Global hook applies to all
 	if (hookSuitePath.length > testSuitePath.length) return false;
 	return hookSuitePath.every((s, i) => testSuitePath[i] === s);
+}
+
+/** Capture a screenshot and save it to the output directory */
+async function captureScreenshot(page: Page, testCase: TestCase, outputDir: string): Promise<string> {
+	// Build a safe filename from suite path + test title
+	const parts = [...testCase.suitePath, testCase.title];
+	const safeName = parts
+		.join('-')
+		.replace(/[^a-zA-Z0-9_-]/g, '_')
+		.replace(/_+/g, '_')
+		.slice(0, 200);
+	const timestamp = Date.now();
+	const filename = `${safeName}-${timestamp}.png`;
+	const screenshotDir = join(outputDir, 'screenshots');
+
+	// Ensure directory exists
+	await mkdir(screenshotDir, { recursive: true });
+
+	// Capture and save
+	const buffer = await page.screenshot();
+	const filePath = join(screenshotDir, filename);
+	await writeFile(filePath, buffer);
+
+	return filePath;
 }
 
 /** Result of running a single test */
@@ -340,4 +436,6 @@ export interface TestResult {
 	status: 'passed' | 'failed' | 'skipped';
 	duration: number;
 	error?: Error;
+	/** Path to screenshot file (if captured on failure) */
+	screenshotPath?: string;
 }

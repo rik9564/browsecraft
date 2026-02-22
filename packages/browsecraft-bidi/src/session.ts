@@ -23,6 +23,7 @@ import type {
 	BrowsingContextReloadParams,
 	BrowsingContextSetViewportParams,
 	BrowsingContextHandleUserPromptParams,
+	BrowsingContextTraverseHistoryParams,
 	InputPerformActionsParams,
 	InputReleaseActionsParams,
 	InputSetFilesParams,
@@ -43,6 +44,12 @@ import type {
 	SessionNewResult,
 	SharedReference,
 	NodeRemoteValue,
+	StorageGetCookiesParams,
+	StorageGetCookiesResult,
+	StorageSetCookieParams,
+	StorageSetCookieResult,
+	StorageDeleteCookiesParams,
+	StorageDeleteCookiesResult,
 } from './types.js';
 import type { EventHandler } from './transport.js';
 
@@ -96,6 +103,7 @@ export class BiDiSession {
 	readonly script: ScriptModule;
 	readonly network: NetworkModule;
 	readonly input: InputModule;
+	readonly storage: StorageModule;
 
 	private constructor(transport: Transport) {
 		this.transport = transport;
@@ -103,6 +111,7 @@ export class BiDiSession {
 		this.script = new ScriptModule(transport);
 		this.network = new NetworkModule(transport);
 		this.input = new InputModule(transport);
+		this.storage = new StorageModule(transport);
 	}
 
 	/**
@@ -303,6 +312,11 @@ class BrowsingContextModule {
 	async handleUserPrompt(params: BrowsingContextHandleUserPromptParams): Promise<void> {
 		await this.transport.send('browsingContext.handleUserPrompt', toParams(params));
 	}
+
+	/** Navigate forward/backward in history (delta: -1 = back, +1 = forward) */
+	async traverseHistory(params: BrowsingContextTraverseHistoryParams): Promise<void> {
+		await this.transport.send('browsingContext.traverseHistory', toParams(params));
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -396,5 +410,28 @@ class InputModule {
 	/** Set files for a file input element */
 	async setFiles(params: InputSetFilesParams): Promise<void> {
 		await this.transport.send('input.setFiles', toParams(params));
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Module: storage
+// ---------------------------------------------------------------------------
+
+class StorageModule {
+	constructor(private transport: Transport) {}
+
+	/** Get cookies matching optional filter */
+	async getCookies(params?: StorageGetCookiesParams): Promise<StorageGetCookiesResult> {
+		return asResult(this.transport.send('storage.getCookies', params ? toParams(params) : {}));
+	}
+
+	/** Set a cookie */
+	async setCookie(params: StorageSetCookieParams): Promise<StorageSetCookieResult> {
+		return asResult(this.transport.send('storage.setCookie', toParams(params)));
+	}
+
+	/** Delete cookies matching optional filter */
+	async deleteCookies(params?: StorageDeleteCookiesParams): Promise<StorageDeleteCookiesResult> {
+		return asResult(this.transport.send('storage.deleteCookies', params ? toParams(params) : {}));
 	}
 }

@@ -66,15 +66,25 @@ export async function locateElement(
 			// Try each strategy in order
 			const strategies = buildStrategies(opts);
 
-			for (const { locator, strategy } of strategies) {
+			for (const { locator, strategy, isLabelLookup } of strategies) {
 				try {
 					const result = await session.browsingContext.locateNodes({
 						context: contextId,
 						locator,
-						maxNodeCount: (opts.index ?? 0) + 1,
+						maxNodeCount: (opts.index ?? 0) + 10, // fetch extra for label resolution
 					});
 
 					if (result.nodes.length > 0) {
+						// If this is a label lookup, we need to find <label> elements
+						// and resolve their `for` attribute to the associated input
+						if (isLabelLookup) {
+							const resolved = await resolveLabelsToInputs(session, contextId, result.nodes);
+							if (resolved) {
+								return { node: resolved, strategy };
+							}
+							continue;
+						}
+
 						const nodeIndex = opts.index ?? 0;
 						const node = result.nodes[nodeIndex];
 						if (node) {
@@ -153,8 +163,8 @@ function describeTarget(target: ElementTarget): string {
 }
 
 /** Build an ordered list of BiDi locator strategies to try */
-function buildStrategies(opts: LocatorOptions): Array<{ locator: Locator; strategy: string }> {
-	const strategies: Array<{ locator: Locator; strategy: string }> = [];
+function buildStrategies(opts: LocatorOptions): Array<{ locator: Locator; strategy: string; isLabelLookup?: boolean }> {
+	const strategies: Array<{ locator: Locator; strategy: string; isLabelLookup?: boolean }> = [];
 	const matchType = opts.exact ? 'full' : 'partial';
 
 	// If user specified a specific strategy, only use that one
@@ -232,13 +242,28 @@ function buildStrategies(opts: LocatorOptions): Array<{ locator: Locator; strate
 			strategy: `label("${opts.label}")`,
 		});
 
-		// Find by associated <label> via CSS
+		// Find by associated <label> via CSS (aria-label, placeholder, or label[for])
 		strategies.push({
 			locator: {
 				type: 'css',
 				value: `[aria-label="${opts.label}"], [placeholder="${opts.label}"]`,
 			},
 			strategy: `label-css("${opts.label}")`,
+		});
+
+		// Find input associated via <label for="..."> by text
+		// This uses a JS-based approach: find <label> by innerText, get its `for` attr,
+		// then return the input with that id. We do this via innerText locator on the label
+		// and resolve it in the locateElement flow below.
+		strategies.push({
+			locator: {
+				type: 'innerText',
+				value: opts.label,
+				matchType: matchType,
+				ignoreCase: !opts.exact,
+			},
+			strategy: `label-text("${opts.label}")`,
+			isLabelLookup: true,
 		});
 	}
 
@@ -254,4 +279,55 @@ function buildStrategies(opts: LocatorOptions): Array<{ locator: Locator; strate
 	}
 
 	return strategies;
+}
+
+/**
+ * Given a set of nodes found by innerText (which may include <label> elements),
+ * find ones that are <label> elements and resolve their `for` attribute
+ * to the associated input element.
+ */
+async function resolveLabelsToInputs(
+	session: BiDiSession,
+	contextId: string,
+	nodes: NodeRemoteValue[],
+): Promise<NodeRemoteValue | null> {
+	for (const node of nodes) {
+		if (!node.sharedId) continue;
+
+		try {
+			// Check if this node is a <label> and if so, resolve its associated input
+			const result = await session.script.callFunction({
+				functionDeclaration: `function(el) {
+					// If the element is a <label> with a 'for' attribute, find the associated input
+					if (el.tagName === 'LABEL') {
+						const forId = el.getAttribute('for');
+						if (forId) {
+							const input = document.getElementById(forId);
+							if (input) return input;
+						}
+						// Also check for implicit label association (input nested inside label)
+						const nested = el.querySelector('input, textarea, select');
+						if (nested) return nested;
+					}
+					return null;
+				}`,
+				target: { context: contextId },
+				arguments: [{ sharedId: node.sharedId, handle: node.handle }],
+				awaitPromise: false,
+				resultOwnership: 'root',
+			});
+
+			if (
+				result.type === 'success' &&
+				result.result?.type === 'node' &&
+				(result.result as NodeRemoteValue).sharedId
+			) {
+				return result.result as NodeRemoteValue;
+			}
+		} catch {
+			continue;
+		}
+	}
+
+	return null;
 }

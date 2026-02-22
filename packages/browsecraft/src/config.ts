@@ -3,6 +3,7 @@
 // Zero config by default. Override only what you need.
 // ============================================================================
 
+import { cpus } from 'node:os';
 import type { BrowserName } from 'browsecraft-bidi';
 
 /** Full configuration with all options */
@@ -53,7 +54,7 @@ const DEFAULTS: BrowsecraftConfig = {
 	screenshot: 'on-failure',
 	baseURL: '',
 	viewport: { width: 1280, height: 720 },
-	workers: Math.max(1, Math.floor((globalThis?.navigator?.hardwareConcurrency ?? 4) / 2)),
+	workers: Math.max(1, Math.floor((typeof cpus === 'function' ? cpus().length : 4) / 2)),
 	testMatch: '**/*.test.{ts,js,mts,mjs}',
 	outputDir: '.browsecraft',
 	ai: 'auto',

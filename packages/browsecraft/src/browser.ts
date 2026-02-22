@@ -100,6 +100,18 @@ export class Browser {
 
 		const page = new Page(this.session, contextId, this.config);
 		this.pages.push(page);
+
+		// Listen for context destroyed events to clean up the pages array
+		this.session.on('browsingContext.closed', (event) => {
+			const params = event.params as { context?: string };
+			if (params.context === contextId) {
+				const idx = this.pages.indexOf(page);
+				if (idx !== -1) {
+					this.pages.splice(idx, 1);
+				}
+			}
+		});
+
 		return page;
 	}
 
@@ -120,9 +132,14 @@ export class Browser {
 			const result = await this.session.send('browser.createUserContext', {});
 			const userContext = (result as { userContext: string }).userContext;
 			return new BrowserContext(this.session, this.config, userContext);
-		} catch {
-			// If user contexts aren't supported, fall back to a lightweight wrapper
-			// that still creates pages in the default context
+		} catch (err) {
+			// User contexts are not supported by all browser versions.
+			// Warn the user and fall back to a non-isolated context.
+			console.warn(
+				'[browsecraft] Warning: browser.createUserContext is not supported. ' +
+				'Pages will share cookies/storage. ' +
+				(err instanceof Error ? err.message : String(err)),
+			);
 			return new BrowserContext(this.session, this.config, null);
 		}
 	}

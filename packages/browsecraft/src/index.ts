@@ -12,7 +12,7 @@
 // ============================================================================
 
 // Core test API
-export { test, describe, beforeAll, afterAll, beforeEach, afterEach, testRegistry, runTest } from './test.js';
+export { test, describe, beforeAll, afterAll, beforeEach, afterEach, testRegistry, runTest, runAfterAllHooks, resetTestState } from './test.js';
 export type { TestFixtures, TestCase, TestOptions, TestResult } from './test.js';
 
 // Assertions
@@ -26,6 +26,9 @@ export type { BrowsecraftConfig, UserConfig, AIConfig } from './config.js';
 export { Browser, BrowserContext } from './browser.js';
 export { Page, ElementHandle } from './page.js';
 export type { GotoOptions, ClickOptions, FillOptions, MockResponse } from './page.js';
+
+// Re-export cookie types for convenience
+export type { StorageCookie } from 'browsecraft-bidi';
 
 // Locator types (for advanced usage)
 export type { ElementTarget, LocatorOptions } from './locator.js';

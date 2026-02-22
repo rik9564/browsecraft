@@ -13,6 +13,8 @@ import type {
 	SharedReference,
 	NetworkInterceptPhase,
 	ScriptEvaluateResult,
+	StorageCookie,
+	NetworkSetCookieHeader,
 } from 'browsecraft-bidi';
 import { locateElement, locateAllElements, type ElementTarget, type LocatedElement } from './locator.js';
 import { waitFor, waitForLoadState, type WaitOptions } from './wait.js';
@@ -70,6 +72,8 @@ export class Page {
 	private config: BrowsecraftConfig;
 	/** @internal */
 	private interceptIds: string[] = [];
+	/** @internal -- event listener unsubscribe functions for cleanup */
+	private eventCleanups: Array<() => void> = [];
 
 	constructor(session: BiDiSession, contextId: string, config: BrowsecraftConfig) {
 		this.session = session;
@@ -114,10 +118,9 @@ export class Page {
 	 * Go back in browser history.
 	 */
 	async goBack(): Promise<void> {
-		await this.session.script.evaluate({
-			expression: 'history.back()',
-			target: { context: this.contextId },
-			awaitPromise: false,
+		await this.session.browsingContext.traverseHistory({
+			context: this.contextId,
+			delta: -1,
 		});
 	}
 
@@ -125,10 +128,9 @@ export class Page {
 	 * Go forward in browser history.
 	 */
 	async goForward(): Promise<void> {
-		await this.session.script.evaluate({
-			expression: 'history.forward()',
-			target: { context: this.contextId },
-			awaitPromise: false,
+		await this.session.browsingContext.traverseHistory({
+			context: this.contextId,
+			delta: 1,
 		});
 	}
 
@@ -447,6 +449,79 @@ export class Page {
 	}
 
 	// -----------------------------------------------------------------------
+	// Cookies
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Get cookies for the current page's browsing context.
+	 *
+	 * ```ts
+	 * const cookies = await page.cookies();
+	 * const session = cookies.find(c => c.name === 'session_id');
+	 * ```
+	 */
+	async cookies(filter?: { name?: string; domain?: string; path?: string }): Promise<StorageCookie[]> {
+		const result = await this.session.storage.getCookies({
+			filter: filter ? {
+				name: filter.name,
+				domain: filter.domain,
+				path: filter.path,
+			} : undefined,
+			partition: { type: 'context', context: this.contextId },
+		});
+		return result.cookies;
+	}
+
+	/**
+	 * Set one or more cookies.
+	 *
+	 * ```ts
+	 * await page.setCookies([
+	 *   { name: 'token', value: 'abc123', domain: 'example.com' },
+	 *   { name: 'theme', value: 'dark', domain: 'example.com' },
+	 * ]);
+	 * ```
+	 */
+	async setCookies(cookies: Array<{ name: string; value: string; domain?: string; path?: string; httpOnly?: boolean; secure?: boolean; sameSite?: 'strict' | 'lax' | 'none'; expiry?: number }>): Promise<void> {
+		for (const cookie of cookies) {
+			const cookieHeader: NetworkSetCookieHeader = {
+				name: cookie.name,
+				value: { type: 'string', value: cookie.value },
+				domain: cookie.domain,
+				path: cookie.path,
+				httpOnly: cookie.httpOnly,
+				secure: cookie.secure,
+				sameSite: cookie.sameSite,
+				expiry: cookie.expiry,
+			};
+			await this.session.storage.setCookie({
+				cookie: cookieHeader,
+				partition: { type: 'context', context: this.contextId },
+			});
+		}
+	}
+
+	/**
+	 * Clear all cookies (or those matching a filter).
+	 *
+	 * ```ts
+	 * await page.clearCookies();                           // all cookies
+	 * await page.clearCookies({ name: 'session_id' });     // specific cookie
+	 * await page.clearCookies({ domain: 'example.com' });  // by domain
+	 * ```
+	 */
+	async clearCookies(filter?: { name?: string; domain?: string; path?: string }): Promise<void> {
+		await this.session.storage.deleteCookies({
+			filter: filter ? {
+				name: filter.name,
+				domain: filter.domain,
+				path: filter.path,
+			} : undefined,
+			partition: { type: 'context', context: this.contextId },
+		});
+	}
+
+	// -----------------------------------------------------------------------
 	// JavaScript execution
 	// -----------------------------------------------------------------------
 
@@ -528,7 +603,7 @@ export class Page {
 		this.interceptIds.push(result.intercept);
 
 		// Handle intercepted requests
-		this.session.on('network.beforeRequestSent', async (event) => {
+		const unsubscribe = this.session.on('network.beforeRequestSent', async (event) => {
 			const params = event.params as {
 				context: string;
 				request: { request: string; method: string };
@@ -556,6 +631,22 @@ export class Page {
 				body: body ? { type: 'string', value: body } : undefined,
 			});
 		});
+		this.eventCleanups.push(unsubscribe);
+	}
+
+	/**
+	 * Remove all network mocks and clean up event listeners.
+	 */
+	async clearMocks(): Promise<void> {
+		for (const id of this.interceptIds) {
+			await this.session.network.removeIntercept({ intercept: id }).catch(() => {});
+		}
+		this.interceptIds = [];
+
+		for (const cleanup of this.eventCleanups) {
+			cleanup();
+		}
+		this.eventCleanups = [];
 	}
 
 	// -----------------------------------------------------------------------
@@ -979,11 +1070,8 @@ export class Page {
 	 * Close this page/tab.
 	 */
 	async close(): Promise<void> {
-		// Remove all intercepts
-		for (const id of this.interceptIds) {
-			await this.session.network.removeIntercept({ intercept: id }).catch(() => {});
-		}
-		this.interceptIds = [];
+		// Clean up all mocks and event listeners
+		await this.clearMocks();
 
 		await this.session.browsingContext.close({ context: this.contextId });
 	}
@@ -1046,12 +1134,20 @@ export class Page {
 		const result = await this.session.script.callFunction({
 			functionDeclaration: `function(el) {
 				const rect = el.getBoundingClientRect();
+				if (rect.width === 0 && rect.height === 0) {
+					throw new Error('Element has zero size -- it may be hidden or not rendered');
+				}
 				return { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) };
 			}`,
 			target: { context: this.contextId },
 			arguments: [ref],
 			awaitPromise: false,
 		});
+
+		if (result.type === 'exception') {
+			const errorText = result.exceptionDetails?.text ?? 'Failed to get element position';
+			throw new Error(`Cannot interact with element: ${errorText}`);
+		}
 
 		if (result.type === 'success' && result.result?.type === 'object') {
 			const val = result.result.value as unknown;
@@ -1060,13 +1156,18 @@ export class Page {
 				const map = new Map(val as [string, unknown][]);
 				const xVal = map.get('x');
 				const yVal = map.get('y');
-				const x = typeof xVal === 'object' && xVal !== null && 'value' in xVal ? (xVal as { value: number }).value : 0;
-				const y = typeof yVal === 'object' && yVal !== null && 'value' in yVal ? (yVal as { value: number }).value : 0;
-				return { x, y };
+				const x = typeof xVal === 'object' && xVal !== null && 'value' in xVal ? (xVal as { value: number }).value : null;
+				const y = typeof yVal === 'object' && yVal !== null && 'value' in yVal ? (yVal as { value: number }).value : null;
+				if (x !== null && y !== null) {
+					return { x, y };
+				}
 			}
 		}
 
-		return { x: 0, y: 0 };
+		throw new Error(
+			'Cannot get element position: unexpected response from browser. ' +
+			'The element may not be visible or may not have a bounding rectangle.',
+		);
 	}
 
 	/** Scroll element into view and click it */
