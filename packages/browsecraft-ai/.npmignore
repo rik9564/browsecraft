@@ -1,0 +1,23 @@
+# Source code — never publish
+src/
+tsconfig.json
+tsup.config.ts
+
+# Development files
+*.test.*
+*.spec.*
+.turbo/
+coverage/
+node_modules/
+
+# Environment and secrets
+.env
+.env.*
+
+# Editor and OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
