@@ -662,8 +662,6 @@ function parseExamples(state: ParserState): Examples {
 // Steps
 // ---------------------------------------------------------------------------
 
-const ALL_STEP_KEYWORDS = ['Given', 'When', 'Then', 'And', 'But', '*'];
-
 function parseSteps(state: ParserState): Step[] {
 	const steps: Step[] = [];
 	const allStepKws = [

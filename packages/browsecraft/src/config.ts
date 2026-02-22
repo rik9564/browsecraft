@@ -24,6 +24,8 @@ export interface BrowsecraftConfig {
 	executablePath?: string;
 	/** Viewport size (default: 1280x720) */
 	viewport: { width: number; height: number };
+	/** Start the browser window maximized (headed mode only, default: false) */
+	maximized: boolean;
 	/** Number of parallel workers (default: CPU cores / 2) */
 	workers: number;
 	/** Test file pattern (default: '**\/*.test.{ts,js,mts,mjs}') */
@@ -56,6 +58,7 @@ const DEFAULTS: BrowsecraftConfig = {
 	screenshot: 'on-failure',
 	baseURL: '',
 	viewport: { width: 1280, height: 720 },
+	maximized: false,
 	workers: Math.max(1, Math.floor((typeof cpus === 'function' ? cpus().length : 4) / 2)),
 	testMatch: '**/*.test.{ts,js,mts,mjs}',
 	outputDir: '.browsecraft',

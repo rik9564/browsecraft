@@ -37,6 +37,7 @@ import {
 	type StepRegistry,
 	BrowsecraftDataTable,
 	globalRegistry,
+	escapeRegex,
 } from './step-registry.js';
 
 import { type HookRegistry, type HookContext, globalHookRegistry } from './hooks.js';
@@ -224,7 +225,7 @@ export class BddExecutor {
 		return {
 			features: featureResults,
 			duration,
-			summary: this.computeSummary(featureResults),
+			summary: computeSummary(featureResults),
 		};
 	}
 
@@ -768,7 +769,7 @@ export class BddExecutor {
 	private expandPlaceholders(text: string, values: Record<string, string>): string {
 		let result = text;
 		for (const [key, value] of Object.entries(values)) {
-			result = result.replace(new RegExp(`<${this.escapeRegex(key)}>`, 'g'), value);
+			result = result.replace(new RegExp(`<${escapeRegex(key)}>`, 'g'), value);
 		}
 		return result;
 	}
@@ -791,10 +792,6 @@ export class BddExecutor {
 		};
 	}
 
-	private escapeRegex(str: string): string {
-		return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	}
-
 	private formatSuggestions(text: string): string {
 		const suggestions = this.registry.suggest(text, 3);
 		if (suggestions.length === 0) return '';
@@ -802,42 +799,47 @@ export class BddExecutor {
 		const lines = suggestions.map((s) => `  - ${s.pattern}`);
 		return `\nDid you mean:\n${lines.join('\n')}`;
 	}
+}
 
-	private computeSummary(features: FeatureResult[]): RunResult['summary'] {
-		const summary = {
-			features: { total: 0, passed: 0, failed: 0, skipped: 0 },
-			scenarios: { total: 0, passed: 0, failed: 0, skipped: 0, pending: 0 },
-			steps: { total: 0, passed: 0, failed: 0, skipped: 0, pending: 0, undefined: 0 },
-		};
+// ---------------------------------------------------------------------------
+// Summary computation (shared with ts-bdd.ts)
+// ---------------------------------------------------------------------------
 
-		for (const f of features) {
-			summary.features.total++;
-			if (f.status === 'passed') summary.features.passed++;
-			else if (f.status === 'failed') summary.features.failed++;
-			else summary.features.skipped++;
+/** Compute a summary of feature/scenario/step pass/fail counts. */
+export function computeSummary(features: FeatureResult[]): RunResult['summary'] {
+	const summary = {
+		features: { total: 0, passed: 0, failed: 0, skipped: 0 },
+		scenarios: { total: 0, passed: 0, failed: 0, skipped: 0, pending: 0 },
+		steps: { total: 0, passed: 0, failed: 0, skipped: 0, pending: 0, undefined: 0 },
+	};
 
-			for (const s of f.scenarios) {
-				summary.scenarios.total++;
-				if (s.status === 'passed') summary.scenarios.passed++;
-				else if (s.status === 'failed') summary.scenarios.failed++;
-				else if (s.status === 'skipped') summary.scenarios.skipped++;
-				else summary.scenarios.pending++;
+	for (const f of features) {
+		summary.features.total++;
+		if (f.status === 'passed') summary.features.passed++;
+		else if (f.status === 'failed') summary.features.failed++;
+		else summary.features.skipped++;
 
-				for (const st of s.steps) {
-					summary.steps.total++;
-					switch (st.status) {
-						case 'passed': summary.steps.passed++; break;
-						case 'failed': summary.steps.failed++; break;
-						case 'skipped': summary.steps.skipped++; break;
-						case 'pending': summary.steps.pending++; break;
-						case 'undefined': summary.steps.undefined++; break;
-					}
+		for (const s of f.scenarios) {
+			summary.scenarios.total++;
+			if (s.status === 'passed') summary.scenarios.passed++;
+			else if (s.status === 'failed') summary.scenarios.failed++;
+			else if (s.status === 'skipped') summary.scenarios.skipped++;
+			else summary.scenarios.pending++;
+
+			for (const st of s.steps) {
+				summary.steps.total++;
+				switch (st.status) {
+					case 'passed': summary.steps.passed++; break;
+					case 'failed': summary.steps.failed++; break;
+					case 'skipped': summary.steps.skipped++; break;
+					case 'pending': summary.steps.pending++; break;
+					case 'undefined': summary.steps.undefined++; break;
 				}
 			}
 		}
-
-		return summary;
 	}
+
+	return summary;
 }
 
 // ---------------------------------------------------------------------------

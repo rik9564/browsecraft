@@ -1,16 +1,78 @@
 // ============================================================================
 // Browsecraft - Browser Class
 // Manages a browser instance. Creates pages. Handles lifecycle.
-//
-// const browser = await Browser.launch();
-// const page = await browser.newPage();
-// await page.goto('https://example.com');
-// await browser.close();
 // ============================================================================
 
 import { BiDiSession, type SessionOptions } from 'browsecraft-bidi';
 import { Page } from './page.js';
 import { resolveConfig, type BrowsecraftConfig, type UserConfig } from './config.js';
+
+// ---------------------------------------------------------------------------
+// Shared viewport setup helper (used by both Browser and BrowserContext)
+// ---------------------------------------------------------------------------
+
+/**
+ * Configure the viewport for a newly created browsing context.
+ *
+ * - Headless: uses BiDi setViewport (device metrics emulation).
+ * - Headed: uses window.resizeTo() to avoid gray dead-space from emulation.
+ * - Maximized: skips all resizing — the browser is already full screen.
+ */
+async function applyViewport(
+	session: BiDiSession,
+	contextId: string,
+	config: BrowsecraftConfig,
+): Promise<void> {
+	if (config.maximized && !config.headless) {
+		// Maximized — browser fills the screen, no resizing needed
+		return;
+	}
+
+	if (config.headless) {
+		try {
+			await session.browsingContext.setViewport({
+				context: contextId,
+				viewport: config.viewport,
+			});
+		} catch {
+			// Some browsers/versions may not support setViewport
+		}
+		return;
+	}
+
+	// Headed mode: resize the outer window so its natural content area
+	// matches the desired viewport (avoids device emulation artifacts).
+	try {
+		const { width, height } = config.viewport;
+		await session.script.callFunction({
+			functionDeclaration: `function(targetW, targetH) {
+				const chromeW = window.outerWidth - window.innerWidth;
+				const chromeH = window.outerHeight - window.innerHeight;
+				window.resizeTo(targetW + chromeW, targetH + chromeH);
+			}`,
+			target: { context: contextId },
+			arguments: [
+				{ type: 'number', value: width },
+				{ type: 'number', value: height },
+			],
+			awaitPromise: false,
+		});
+	} catch {
+		// Fallback to setViewport if resizeTo fails
+		try {
+			await session.browsingContext.setViewport({
+				context: contextId,
+				viewport: config.viewport,
+			});
+		} catch {
+			// Continue anyway
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Browser
+// ---------------------------------------------------------------------------
 
 /**
  * Browser represents a running browser instance.
@@ -53,13 +115,11 @@ export class Browser {
 			executablePath: config.executablePath,
 			debug: config.debug,
 			timeout: config.timeout,
+			maximized: config.maximized,
 		};
 
 		const session = await BiDiSession.launch(sessionOptions);
-		const browser = new Browser(session, config);
-
-		// Set up default viewport on new contexts
-		return browser;
+		return new Browser(session, config);
 	}
 
 	/**
@@ -84,76 +144,27 @@ export class Browser {
 	 * ```
 	 */
 	async newPage(): Promise<Page> {
-		// Create a new browsing context (tab)
 		const result = await this.session.browsingContext.create({ type: 'tab' });
 		const contextId = result.context;
 
-		// Set viewport size.
-		// In headless mode: use BiDi setViewport (device metrics emulation).
-		// In headed mode: skip setViewport (it creates gray dead-space borders
-		// due to device emulation inside a physical window). Instead, resize
-		// the outer window so its content area naturally matches the viewport.
-		if (this.config.headless) {
-			try {
-				await this.session.browsingContext.setViewport({
-					context: contextId,
-					viewport: this.config.viewport,
-				});
-			} catch {
-				// Some browsers/versions may not support setViewport -- continue anyway
-			}
-		} else {
-			// Headed mode: resize the browser window so the content area
-			// matches the desired viewport dimensions. We measure the chrome
-			// overhead (tabs, toolbar, borders) then resize the outer window.
-			try {
-				const { width, height } = this.config.viewport;
-				await this.session.script.callFunction({
-					functionDeclaration: `function(targetW, targetH) {
-						const chromeW = window.outerWidth - window.innerWidth;
-						const chromeH = window.outerHeight - window.innerHeight;
-						window.resizeTo(targetW + chromeW, targetH + chromeH);
-					}`,
-					target: { context: contextId },
-					arguments: [
-						{ type: 'number', value: width },
-						{ type: 'number', value: height },
-					],
-					awaitPromise: false,
-				});
-			} catch {
-				// Fallback to setViewport if resizeTo fails
-				try {
-					await this.session.browsingContext.setViewport({
-						context: contextId,
-						viewport: this.config.viewport,
-					});
-				} catch {
-					// Continue anyway
-				}
-			}
-		}
+		await applyViewport(this.session, contextId, this.config);
 
 		const page = new Page(this.session, contextId, this.config);
 		this.pages.push(page);
 
-		// Listen for context destroyed events to clean up the pages array
+		// Clean up pages array when context is destroyed
 		this.session.on('browsingContext.closed', (event) => {
 			const params = event.params as { context?: string };
 			if (params.context === contextId) {
 				const idx = this.pages.indexOf(page);
-				if (idx !== -1) {
-					this.pages.splice(idx, 1);
-				}
+				if (idx !== -1) this.pages.splice(idx, 1);
 			}
 		});
 
 		return page;
 	}
 
-	/**
-	 * Get all open pages.
-	 */
+	/** Get all open pages. */
 	get openPages(): Page[] {
 		return [...this.pages];
 	}
@@ -163,14 +174,11 @@ export class Browser {
 	 * Returns a BrowserContext that can create its own pages.
 	 */
 	async newContext(): Promise<BrowserContext> {
-		// BiDi uses user contexts for isolation
 		try {
 			const result = await this.session.send('browser.createUserContext', {});
 			const userContext = (result as { userContext: string }).userContext;
 			return new BrowserContext(this.session, this.config, userContext);
 		} catch (err) {
-			// User contexts are not supported by all browser versions.
-			// Warn the user and fall back to a non-isolated context.
 			console.warn(
 				'[browsecraft] Warning: browser.createUserContext is not supported. ' +
 				'Pages will share cookies/storage. ' +
@@ -180,17 +188,12 @@ export class Browser {
 		}
 	}
 
-	/**
-	 * Close the browser and clean up all resources.
-	 */
+	/** Close the browser and clean up all resources. */
 	async close(): Promise<void> {
-		// Close all pages
 		for (const page of this.pages) {
 			await page.close().catch(() => {});
 		}
 		this.pages = [];
-
-		// Close the session + kill the browser process
 		await this.session.close();
 	}
 
@@ -229,9 +232,7 @@ export class BrowserContext {
 		this.userContext = userContext;
 	}
 
-	/**
-	 * Create a new page in this context.
-	 */
+	/** Create a new page in this context. */
 	async newPage(): Promise<Page> {
 		const params: Record<string, unknown> = { type: 'tab' };
 		if (this.userContext) {
@@ -241,59 +242,14 @@ export class BrowserContext {
 		const result = await this.session.browsingContext.create(params as any);
 		const contextId = result.context;
 
-		// Set viewport size.
-		// In headless mode: use BiDi setViewport (device metrics emulation).
-		// In headed mode: skip setViewport (it creates gray dead-space borders
-		// due to device emulation inside a physical window). Instead, resize
-		// the outer window so its content area naturally matches the viewport.
-		if (this.config.headless) {
-			try {
-				await this.session.browsingContext.setViewport({
-					context: contextId,
-					viewport: this.config.viewport,
-				});
-			} catch {
-				// Some browsers/versions may not support setViewport -- continue anyway
-			}
-		} else {
-			// Headed mode: resize the browser window so the content area
-			// matches the desired viewport dimensions.
-			try {
-				const { width, height } = this.config.viewport;
-				await this.session.script.callFunction({
-					functionDeclaration: `function(targetW, targetH) {
-						const chromeW = window.outerWidth - window.innerWidth;
-						const chromeH = window.outerHeight - window.innerHeight;
-						window.resizeTo(targetW + chromeW, targetH + chromeH);
-					}`,
-					target: { context: contextId },
-					arguments: [
-						{ type: 'number', value: width },
-						{ type: 'number', value: height },
-					],
-					awaitPromise: false,
-				});
-			} catch {
-				// Fallback to setViewport if resizeTo fails
-				try {
-					await this.session.browsingContext.setViewport({
-						context: contextId,
-						viewport: this.config.viewport,
-					});
-				} catch {
-					// Continue anyway
-				}
-			}
-		}
+		await applyViewport(this.session, contextId, this.config);
 
 		const page = new Page(this.session, contextId, this.config);
 		this.pages.push(page);
 		return page;
 	}
 
-	/**
-	 * Close this context and all its pages.
-	 */
+	/** Close this context and all its pages. */
 	async close(): Promise<void> {
 		for (const page of this.pages) {
 			await page.close().catch(() => {});

@@ -13,6 +13,8 @@
 //   node tests/bdd-saucelabs.mjs
 //   node tests/bdd-saucelabs.mjs --tags "@smoke"
 //   node tests/bdd-saucelabs.mjs --tags "@login and not @negative"
+//   node tests/bdd-saucelabs.mjs --headed
+//   node tests/bdd-saucelabs.mjs --headed --maximized
 // ============================================================================
 
 import { readFileSync } from 'node:fs';
@@ -213,10 +215,17 @@ async function main() {
 	// Parse CLI args
 	const args = process.argv.slice(2);
 	let tagFilter = undefined;
+	let headed = false;
+	let maximized = false;
 	for (let i = 0; i < args.length; i++) {
 		if (args[i] === '--tags' && args[i + 1]) {
 			tagFilter = args[i + 1];
 			i++;
+		} else if (args[i] === '--headed') {
+			headed = true;
+		} else if (args[i] === '--maximized' || args[i] === '--max') {
+			maximized = true;
+			headed = true; // maximized implies headed
 		}
 	}
 
@@ -247,9 +256,11 @@ async function main() {
 	try {
 		browser = await Browser.launch({
 			browser: 'chrome',
-			headless: true,
+			headless: !headed,
+			maximized,
 		});
-		console.log(`  ${PASS} Browser launched (headless Chrome)\n`);
+		const mode = headed ? (maximized ? 'headed maximized' : 'headed') : 'headless';
+		console.log(`  ${PASS} Browser launched (${mode} Chrome)\n`);
 
 		// 3. Create executor with world factory that provides fresh page per scenario
 		const executor = new BddExecutor({

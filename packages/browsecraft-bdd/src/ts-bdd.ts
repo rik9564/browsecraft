@@ -35,6 +35,7 @@ import type {
 	StepResult,
 	StepStatus,
 } from './executor.js';
+import { computeSummary } from './executor.js';
 import type { StepWorld } from './step-registry.js';
 import { type HookContext, globalHookRegistry, type HookRegistry } from './hooks.js';
 import { evaluateTagExpression, parseTagExpression, type TagExpression } from './tags.js';
@@ -580,44 +581,4 @@ async function runTsStep(step: PendingStep, timeout: number): Promise<StepResult
 			logs: [],
 		};
 	}
-}
-
-// ---------------------------------------------------------------------------
-// Summary computation (shared with executor)
-// ---------------------------------------------------------------------------
-
-function computeSummary(features: FeatureResult[]): RunResult['summary'] {
-	const summary = {
-		features: { total: 0, passed: 0, failed: 0, skipped: 0 },
-		scenarios: { total: 0, passed: 0, failed: 0, skipped: 0, pending: 0 },
-		steps: { total: 0, passed: 0, failed: 0, skipped: 0, pending: 0, undefined: 0 },
-	};
-
-	for (const f of features) {
-		summary.features.total++;
-		if (f.status === 'passed') summary.features.passed++;
-		else if (f.status === 'failed') summary.features.failed++;
-		else summary.features.skipped++;
-
-		for (const s of f.scenarios) {
-			summary.scenarios.total++;
-			if (s.status === 'passed') summary.scenarios.passed++;
-			else if (s.status === 'failed') summary.scenarios.failed++;
-			else if (s.status === 'skipped') summary.scenarios.skipped++;
-			else summary.scenarios.pending++;
-
-			for (const st of s.steps) {
-				summary.steps.total++;
-				switch (st.status) {
-					case 'passed': summary.steps.passed++; break;
-					case 'failed': summary.steps.failed++; break;
-					case 'skipped': summary.steps.skipped++; break;
-					case 'pending': summary.steps.pending++; break;
-					case 'undefined': summary.steps.undefined++; break;
-				}
-			}
-		}
-	}
-
-	return summary;
 }

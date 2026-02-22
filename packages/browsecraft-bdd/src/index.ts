@@ -90,6 +90,7 @@ export {
 	BddExecutor,
 	createExecutor,
 	pending,
+	computeSummary,
 	type ExecutorOptions,
 	type RunResult,
 	type FeatureResult,

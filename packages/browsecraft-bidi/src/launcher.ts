@@ -23,6 +23,8 @@ export interface LaunchOptions {
 	executablePath?: string;
 	/** Extra args to pass to the browser process */
 	args?: string[];
+	/** Start the browser window maximized (headed mode only, default: false) */
+	maximized?: boolean;
 	/** Timeout for browser startup in ms (default: 30000) */
 	timeout?: number;
 }
@@ -67,7 +69,7 @@ export async function launchBrowser(options: LaunchOptions = {}): Promise<Launch
 		);
 	}
 
-	const args = buildArgs(browser, { headless, userDataDir, extraArgs: options.args });
+	const args = buildArgs(browser, { headless, userDataDir, maximized: options.maximized, extraArgs: options.args });
 
 	const proc = spawn(executablePath, args, {
 		stdio: ['pipe', 'pipe', 'pipe'],
@@ -211,6 +213,7 @@ function getEdgePaths(platform: string): string[] {
 interface BuildArgsOptions {
 	headless: boolean;
 	userDataDir: string;
+	maximized?: boolean;
 	extraArgs?: string[];
 }
 
@@ -266,9 +269,12 @@ function buildChromiumArgs(options: BuildArgsOptions): string[] {
 		// In headed mode, set a sensible window size so the viewport fits properly
 		// and content is aligned. Without this, Chrome may open with a tiny default
 		// window causing elements to render outside the visible area.
-		// Extra pixels account for Chrome's UI chrome (toolbar, tabs, etc.)
-		args.unshift('--window-size=1366,868');
-		// Remove --no-startup-window for headed mode so the window is visible
+		if (options.maximized) {
+			args.unshift('--start-maximized');
+		} else {
+			// Extra pixels account for Chrome's UI chrome (toolbar, tabs, etc.)
+			args.unshift('--window-size=1366,868');
+		}
 	}
 
 	// --no-startup-window is needed for headless; in headed mode it prevents

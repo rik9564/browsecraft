@@ -12,6 +12,8 @@ export interface BrowsecraftConfig {
 	baseURL: string;
 	executablePath?: string;
 	viewport: { width: number; height: number };
+	/** Start the browser window maximized (headed mode only, default: false) */
+	maximized: boolean;
 	workers: number;
 	testMatch: string;
 	outputDir: string;

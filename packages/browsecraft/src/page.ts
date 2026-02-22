@@ -11,7 +11,6 @@ import type {
 	BiDiSession,
 	NodeRemoteValue,
 	SharedReference,
-	NetworkInterceptPhase,
 	ScriptEvaluateResult,
 	StorageCookie,
 	NetworkSetCookieHeader,
@@ -683,7 +682,7 @@ export class Page {
 	async acceptDialog(text?: string): Promise<void> {
 		await this.session.subscribe(['browsingContext.userPromptOpened'], [this.contextId]);
 
-		const event = await this.session.waitForEvent(
+		await this.session.waitForEvent(
 			'browsingContext.userPromptOpened',
 			(e) => (e.params as { context: string }).context === this.contextId,
 		);
@@ -701,7 +700,7 @@ export class Page {
 	async dismissDialog(): Promise<void> {
 		await this.session.subscribe(['browsingContext.userPromptOpened'], [this.contextId]);
 
-		const event = await this.session.waitForEvent(
+		await this.session.waitForEvent(
 			'browsingContext.userPromptOpened',
 			(e) => (e.params as { context: string }).context === this.contextId,
 		);

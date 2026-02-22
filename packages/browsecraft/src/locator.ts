@@ -9,7 +9,7 @@
 // 4. CSS selector: fallback for power users
 // ============================================================================
 
-import type { BiDiSession, Locator, NodeRemoteValue, SharedReference } from 'browsecraft-bidi';
+import type { BiDiSession, Locator, NodeRemoteValue } from 'browsecraft-bidi';
 import { waitFor, type WaitOptions } from './wait.js';
 
 /** What the user passes to click(), fill(), get() */

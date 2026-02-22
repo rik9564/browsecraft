@@ -478,7 +478,7 @@ export function defineParameterType(param: ParameterType): void {
 // Utilities
 // ---------------------------------------------------------------------------
 
-function escapeRegex(str: string): string {
+export function escapeRegex(str: string): string {
 	return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
