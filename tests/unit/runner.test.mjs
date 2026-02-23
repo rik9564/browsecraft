@@ -5,7 +5,10 @@
 // ============================================================================
 
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { TestRunner } from '../../packages/browsecraft-runner/dist/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
 
 const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';
@@ -139,7 +142,7 @@ await testAsync('run returns 1 when a test fails', async () => {
 			ai: 'auto',
 			debug: false,
 		},
-		files: [import.meta.url.replace('file:///', '')], // use this file as the "test file"
+		files: [__filename], // use this file as the "test file"
 	});
 
 	const exitCode = await runner.run(
@@ -182,7 +185,7 @@ await testAsync('run respects grep filter', async () => {
 			ai: 'auto',
 			debug: false,
 		},
-		files: [import.meta.url.replace('file:///', '')],
+		files: [__filename],
 		grep: 'special',
 	});
 
@@ -233,7 +236,7 @@ await testAsync('run handles .only tests', async () => {
 			ai: 'auto',
 			debug: false,
 		},
-		files: [import.meta.url.replace('file:///', '')],
+		files: [__filename],
 	});
 
 	await runner.run(
@@ -269,7 +272,7 @@ await testAsync('run handles retries', async () => {
 			ai: 'auto',
 			debug: false,
 		},
-		files: [import.meta.url.replace('file:///', '')],
+		files: [__filename],
 	});
 
 	await runner.run(
@@ -319,7 +322,7 @@ await testAsync('run bails after first failure when bail=true', async () => {
 			ai: 'auto',
 			debug: false,
 		},
-		files: [import.meta.url.replace('file:///', ''), import.meta.url.replace('file:///', '')],
+		files: [__filename, __filename],
 		bail: true,
 	});
 
