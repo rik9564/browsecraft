@@ -3,10 +3,15 @@
 // most likely replacement by analyzing the current page DOM.
 //
 // Works WITHOUT AI: uses Levenshtein distance + attribute similarity.
-// Works BETTER with AI: sends page snapshot to GitHub Models for intelligent matching.
+// Works BETTER with AI: uses any configured provider for intelligent matching.
+//
+// Layer architecture:
+//   1. Heuristics (Levenshtein + attributes) — always runs, zero cost
+//   2. AI disambiguation — only fires when heuristics are uncertain (<0.8)
 // ============================================================================
 
-import { githubModelsGenerate, isGitHubModelsAvailable } from './github-models.js';
+import type { ProviderConfig } from './providers.js';
+import { isProviderAvailable, providerChat } from './providers.js';
 
 /** A snapshot of the page DOM used for healing */
 export interface PageSnapshot {
@@ -84,15 +89,23 @@ export async function healSelector(
 	options: {
 		/** Optional hint about what the element should be */
 		context?: string;
-		/** Try AI healing via GitHub Models (default true) */
+		/** Try AI healing when heuristics are uncertain (default true) */
 		useAI?: boolean;
-		/** GitHub token for AI features */
+		/** AI provider config. Auto-detects from env when omitted. */
+		provider?: ProviderConfig;
+		/** @deprecated Use `provider.token` instead. GitHub token for AI features. */
 		token?: string;
 		/** Minimum confidence threshold (default 0.3) */
 		minConfidence?: number;
 	} = {},
 ): Promise<HealResult> {
 	const { context, useAI = true, token, minConfidence = 0.3 } = options;
+
+	// Resolve provider: explicit > legacy token > default github-models
+	const provider: ProviderConfig = options.provider ?? {
+		provider: 'github-models',
+		token: token || undefined,
+	};
 
 	// 1. Try non-AI heuristics first (fast, always available)
 	const heuristicResult = heuristicHeal(failedSelector, snapshot, context, minConfidence);
@@ -102,12 +115,12 @@ export async function healSelector(
 		return heuristicResult;
 	}
 
-	// 2. Try AI healing if enabled
+	// 2. Try AI healing if enabled — only when heuristics are uncertain
 	if (useAI) {
 		try {
-			const available = await isGitHubModelsAvailable(token);
+			const available = await isProviderAvailable(provider);
 			if (available) {
-				const aiResult = await aiHeal(failedSelector, snapshot, context, token);
+				const aiResult = await aiHeal(failedSelector, snapshot, context, provider);
 				if (aiResult && aiResult.confidence > heuristicResult.confidence) {
 					return aiResult;
 				}
@@ -259,7 +272,7 @@ async function aiHeal(
 	failedSelector: string,
 	snapshot: PageSnapshot,
 	context?: string,
-	token?: string,
+	provider?: ProviderConfig,
 ): Promise<HealResult | null> {
 	// Build a compact DOM summary (keep it under ~2000 tokens)
 	const elementSummaries = snapshot.elements
@@ -298,13 +311,20 @@ Instructions:
 If no element matches, respond with:
 {"index": -1, "selector": null, "confidence": 0, "reason": "No matching element found"}`;
 
-	const response = await githubModelsGenerate(prompt, {
-		token,
-		system:
-			'You are a web testing expert. You analyze DOM structures and CSS selectors. Always respond with valid JSON only.',
-		temperature: 0.1,
-		maxTokens: 256,
-	});
+	const resolvedProvider: ProviderConfig = provider ?? { provider: 'github-models' };
+
+	const response = await providerChat(
+		[
+			{
+				role: 'system',
+				content:
+					'You are a web testing expert. You analyze DOM structures and CSS selectors. Always respond with valid JSON only.',
+			},
+			{ role: 'user', content: prompt },
+		],
+		resolvedProvider,
+		{ temperature: 0.1, maxTokens: 256 },
+	);
 
 	if (!response) return null;
 

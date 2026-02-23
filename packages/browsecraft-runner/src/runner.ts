@@ -9,6 +9,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { classifyFailure } from './smart-retry.js';
 import type { RunSummary, RunnerOptions, TestResult } from './types.js';
 
 /** A test case as passed to the runner from the browsecraft package */
@@ -91,11 +92,16 @@ export class TestRunner {
 				for (const test of testsToRun) {
 					let result = await executeTest(test);
 
-					// Handle retries
+					// Smart retry — skip retries for deterministic failures
 					const maxRetries = test.options.retries ?? this.options.config.retries;
 					let retryCount = 0;
 
 					while (result.status === 'failed' && retryCount < maxRetries) {
+						const classification = classifyFailure(result.error);
+						if (!classification.retryable) {
+							// Don't waste time retrying assertion/script errors
+							break;
+						}
 						retryCount++;
 						result = await executeTest(test);
 					}

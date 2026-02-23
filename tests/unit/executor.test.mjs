@@ -15,6 +15,15 @@ import {
 	pending,
 } from '../../packages/browsecraft-bdd/dist/index.js';
 
+// AI diagnosis (from browsecraft-ai — may not be built yet)
+let diagnoseFailure = null;
+try {
+	const ai = await import('../../packages/browsecraft-ai/dist/index.js');
+	diagnoseFailure = ai.diagnoseFailure;
+} catch {
+	// browsecraft-ai not built — skip diagnosis tests
+}
+
 const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';
 let passed = 0;
@@ -632,6 +641,39 @@ await testAsync('BddExecutor summary is accurate', async () => {
 	assert.equal(result.summary.steps.total, 2);
 	assert.equal(result.summary.steps.passed, 2);
 });
+
+// -----------------------------------------------------------------------
+// AI Diagnosis — graceful degradation
+// -----------------------------------------------------------------------
+
+if (diagnoseFailure) {
+	await testAsync('diagnoseFailure returns null without provider', async () => {
+		// No GITHUB_TOKEN or OPENAI_API_KEY set → should return null
+		const result = await diagnoseFailure({
+			stepText: 'When I click "Submit"',
+			errorMessage: 'Element not found',
+			errorName: 'ElementNotFoundError',
+		});
+		// Without a real API key, it should gracefully return null
+		assert.equal(result, null);
+	});
+
+	await testAsync('diagnoseFailure never throws', async () => {
+		// Even with garbage input it should not throw
+		const result = await diagnoseFailure({
+			stepText: '',
+			errorMessage: '',
+		});
+		// Should be null (no provider available) or a valid Diagnosis
+		if (result !== null) {
+			assert.ok(typeof result.rootCause === 'string');
+			assert.ok(typeof result.suggestion === 'string');
+			assert.ok(typeof result.confidence === 'number');
+		}
+	});
+} else {
+	console.log('  ⊘ Skipping diagnosis tests (browsecraft-ai not built)');
+}
 
 // -----------------------------------------------------------------------
 // Summary

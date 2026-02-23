@@ -42,3 +42,7 @@ export type {
 	TimingStats,
 	AggregatedSummary,
 } from './result-aggregator.js';
+
+// Smart retry — failure classification
+export { classifyFailure } from './smart-retry.js';
+export type { FailureCategory, FailureClassification } from './smart-retry.js';

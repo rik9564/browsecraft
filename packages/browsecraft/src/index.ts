@@ -65,8 +65,9 @@ export {
 	ElementNotActionableError,
 	NetworkError,
 	TimeoutError,
+	classifyFailure,
 } from './errors.js';
-export type { ElementState } from './errors.js';
+export type { ElementState, FailureCategory, FailureClassification } from './errors.js';
 
 // Re-export cookie types for convenience
 export type { StorageCookie } from 'browsecraft-bidi';

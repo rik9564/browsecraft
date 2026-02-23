@@ -128,6 +128,26 @@ export interface AIStepExecutorConfig {
 	debug?: boolean;
 	/** Application context hint to help AI understand the app */
 	appContext?: string;
+	/**
+	 * Persistent cache file path. When set, action plans are saved to disk
+	 * and restored on startup — zero AI calls on repeat runs.
+	 * Default: '.browsecraft/ai-cache.json'
+	 * Set to null to disable persistence.
+	 */
+	cachePath?: string | null;
+	/**
+	 * Minimum confidence to persist a plan to the cache file.
+	 * Plans below this threshold are used once but not saved,
+	 * forcing a fresh AI call next run. Default: 0.8
+	 */
+	confidenceThreshold?: number;
+	/**
+	 * Cache mode:
+	 * - 'auto'   — use cache if available, call AI for misses (default)
+	 * - 'locked' — ONLY use cached plans, never call AI (for CI without API keys)
+	 * - 'warm'   — always call AI, update cache, even on cache hits
+	 */
+	cacheMode?: 'auto' | 'locked' | 'warm';
 }
 
 // ---------------------------------------------------------------------------
@@ -223,6 +243,10 @@ class LRUCache<K, V> {
 
 	clear(): void {
 		this.cache.clear();
+	}
+
+	entries(): IterableIterator<[K, V]> {
+		return this.cache.entries();
 	}
 }
 
@@ -354,7 +378,11 @@ export class AIStepExecutor {
 	private readonly debugMode: boolean;
 	private readonly cache: LRUCache<string, ActionPlan>;
 	private readonly systemPrompt: string;
+	private readonly cachePath: string | null;
+	private readonly confidenceThreshold: number;
+	private readonly cacheMode: 'auto' | 'locked' | 'warm';
 	private aiAvailable: boolean | null = null;
+	private diskCacheLoaded = false;
 
 	constructor(config: AIStepExecutorConfig = {}) {
 		// Resolve provider config: explicit > legacy token/model > default
@@ -370,11 +398,79 @@ export class AIStepExecutor {
 		this.debugMode = config.debug ?? false;
 		this.cache = new LRUCache(this.cacheSize_);
 		this.systemPrompt = buildSystemPrompt(config.appContext || undefined);
+		this.cachePath = config.cachePath !== null ? (config.cachePath ?? '.browsecraft/ai-cache.json') : null;
+		this.confidenceThreshold = config.confidenceThreshold ?? 0.8;
+		this.cacheMode = config.cacheMode ?? 'auto';
 	}
 
 	/** Get the provider name */
 	get provider(): string {
 		return this.providerConfig.provider;
+	}
+
+	/** Get the current cache mode */
+	get mode(): 'auto' | 'locked' | 'warm' {
+		return this.cacheMode;
+	}
+
+	/**
+	 * Load persistent cache from disk. Called automatically on first step.
+	 * Safe to call multiple times — only loads once.
+	 */
+	private async loadDiskCache(): Promise<void> {
+		if (this.diskCacheLoaded || !this.cachePath) return;
+		this.diskCacheLoaded = true;
+
+		try {
+			const { readFileSync } = await import('node:fs');
+			const raw = readFileSync(this.cachePath, 'utf-8');
+			const entries = JSON.parse(raw) as Array<{ key: string; plan: ActionPlan }>;
+
+			if (Array.isArray(entries)) {
+				for (const entry of entries) {
+					if (entry.key && entry.plan) {
+						this.cache.set(entry.key, entry.plan);
+					}
+				}
+				if (this.debugMode) {
+					console.log(`  [AI] Loaded ${entries.length} cached plans from ${this.cachePath}`);
+				}
+			}
+		} catch {
+			// File doesn't exist yet or is corrupt — start fresh
+		}
+	}
+
+	/**
+	 * Save the current cache to disk. Called after each new AI interpretation.
+	 */
+	private async saveDiskCache(): Promise<void> {
+		if (!this.cachePath) return;
+
+		try {
+			const { mkdirSync, writeFileSync } = await import('node:fs');
+			const { dirname } = await import('node:path');
+
+			// Ensure directory exists
+			mkdirSync(dirname(this.cachePath), { recursive: true });
+
+			// Serialize the cache — only plans that meet confidence threshold
+			const entries: Array<{ key: string; plan: ActionPlan }> = [];
+			// Access internal map via a method on LRUCache
+			for (const [key, plan] of this.cache.entries()) {
+				if (plan.confidence >= this.confidenceThreshold) {
+					entries.push({ key, plan });
+				}
+			}
+
+			writeFileSync(this.cachePath, JSON.stringify(entries, null, 2), 'utf-8');
+
+			if (this.debugMode) {
+				console.log(`  [AI] Saved ${entries.length} plans to ${this.cachePath}`);
+			}
+		} catch {
+			// Non-fatal — disk cache is best-effort
+		}
 	}
 
 	/**
@@ -397,12 +493,16 @@ export class AIStepExecutor {
 			};
 		}
 
+		// Load persistent cache on first call
+		await this.loadDiskCache();
+
 		// Check AI availability (cached after first check)
 		if (this.aiAvailable === null) {
 			this.aiAvailable = await isProviderAvailable(this.providerConfig);
 		}
 
-		if (!this.aiAvailable) {
+		// In locked mode, AI availability is not required — we only use cache
+		if (!this.aiAvailable && this.cacheMode !== 'locked') {
 			const label = getProviderLabel(this.providerConfig.provider);
 			return {
 				handled: false,
@@ -419,16 +519,31 @@ export class AIStepExecutor {
 
 		// 1. Check cache
 		const cacheKey = normalizeForCache(stepText);
-		const cachedPlan = this.cache.get(cacheKey);
+		const cachedPlan = this.cacheMode !== 'warm' ? this.cache.get(cacheKey) : undefined;
 
 		let plan: ActionPlan;
 		let aiTime = 0;
+		let fromCache = false;
 
 		if (cachedPlan) {
 			plan = cachedPlan;
+			fromCache = true;
 			if (this.debugMode) {
 				console.log(`  [AI] Cache hit: "${stepText}"`);
 			}
+		} else if (this.cacheMode === 'locked') {
+			// Locked mode: no cache hit → can't proceed (no live AI calls)
+			return {
+				handled: false,
+				plan: null,
+				passed: false,
+				error: new Error(
+					`[locked mode] No cached plan for step: "${keyword} ${stepText}". Run tests in 'auto' or 'warm' mode first to populate the cache.`,
+				),
+				cached: false,
+				aiTime: 0,
+				execTime: 0,
+			};
 		} else {
 			// 2. Ask AI to interpret the step
 			const aiStart = Date.now();
@@ -449,6 +564,11 @@ export class AIStepExecutor {
 
 			plan = interpreted;
 			this.cache.set(cacheKey, plan);
+
+			// Persist to disk if confidence meets threshold
+			if (plan.confidence >= this.confidenceThreshold) {
+				await this.saveDiskCache();
+			}
 
 			if (this.debugMode) {
 				const label = getProviderLabel(this.providerConfig.provider);
@@ -471,7 +591,7 @@ export class AIStepExecutor {
 				plan,
 				passed: false,
 				error: new Error(`Invalid action plan: ${validationError}`),
-				cached: !!cachedPlan,
+				cached: fromCache,
 				aiTime,
 				execTime: 0,
 			};
@@ -487,7 +607,7 @@ export class AIStepExecutor {
 				handled: true,
 				plan,
 				passed: true,
-				cached: !!cachedPlan,
+				cached: fromCache,
 				aiTime,
 				execTime,
 			};
@@ -497,13 +617,14 @@ export class AIStepExecutor {
 
 			// If execution fails, evict from cache so AI can retry with fresh context
 			this.cache.delete(cacheKey);
+			await this.saveDiskCache();
 
 			return {
 				handled: true,
 				plan,
 				passed: false,
 				error,
-				cached: !!cachedPlan,
+				cached: fromCache,
 				aiTime,
 				execTime,
 			};

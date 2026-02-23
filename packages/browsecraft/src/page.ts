@@ -16,7 +16,8 @@ import type {
 	StorageCookie,
 } from 'browsecraft-bidi';
 import type { BrowsecraftConfig } from './config.js';
-import { ElementNotActionableError } from './errors.js';
+import { resolveAIConfig } from './config.js';
+import { ElementNotActionableError, ElementNotFoundError } from './errors.js';
 import {
 	type ElementTarget,
 	type LocatedElement,
@@ -95,6 +96,10 @@ export class Page {
 	private interceptIds: string[] = [];
 	/** @internal -- event listener unsubscribe functions for cleanup */
 	private eventCleanups: Array<() => void> = [];
+	/** @internal -- adaptive timing: multiplier derived from environment speed */
+	private timingMultiplier = 1.0;
+	/** @internal -- whether timing has been calibrated */
+	private timingCalibrated = false;
 
 	constructor(session: BiDiSession, contextId: string, config: BrowsecraftConfig) {
 		this.session = session;
@@ -118,11 +123,22 @@ export class Page {
 		const fullUrl = this.resolveURL(url);
 		const waitUntil = options?.waitUntil ?? 'complete';
 
+		const navStart = Date.now();
 		await this.session.browsingContext.navigate({
 			context: this.contextId,
 			url: fullUrl,
 			wait: waitUntil,
 		});
+
+		// Calibrate adaptive timing on first navigation.
+		// Fast machine (200ms load) → multiplier stays 1.0
+		// Slow CI VM (3s load)      → multiplier ~2.5, giving actions more time
+		if (!this.timingCalibrated) {
+			this.timingCalibrated = true;
+			const elapsed = Date.now() - navStart;
+			// 800ms baseline. Clamp between 1.0 (never reduce) and 5.0 (cap)
+			this.timingMultiplier = Math.max(1.0, Math.min(5.0, elapsed / 800));
+		}
 	}
 
 	/**
@@ -170,7 +186,7 @@ export class Page {
 	 */
 	async click(target: ElementTarget, options?: ClickOptions): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const located = await locateElement(this.session, this.contextId, target, { timeout });
+		const located = await this.locateWithHealing(target, 'click', { timeout });
 
 		await this.ensureActionable(located, 'click', target, { timeout });
 		await this.scrollIntoViewAndClick(located, options);
@@ -192,7 +208,7 @@ export class Page {
 		const resolvedTarget: ElementTarget =
 			typeof target === 'string' ? { label: target, name: target } : target;
 
-		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
+		const located = await this.locateWithHealing(resolvedTarget, 'fill', { timeout });
 
 		await this.ensureActionable(located, 'fill', target, { timeout });
 
@@ -238,7 +254,7 @@ export class Page {
 		const resolvedTarget: ElementTarget =
 			typeof target === 'string' ? { label: target, name: target } : target;
 
-		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
+		const located = await this.locateWithHealing(resolvedTarget, 'type', { timeout });
 
 		await this.ensureActionable(located, 'type', target, { timeout });
 
@@ -276,7 +292,7 @@ export class Page {
 		const resolvedTarget: ElementTarget =
 			typeof target === 'string' ? { label: target, name: target } : target;
 
-		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
+		const located = await this.locateWithHealing(resolvedTarget, 'select', { timeout });
 
 		await this.ensureActionable(located, 'select', target, { timeout });
 
@@ -308,7 +324,7 @@ export class Page {
 	 */
 	async check(target: ElementTarget, options?: ClickOptions): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const located = await locateElement(this.session, this.contextId, target, { timeout });
+		const located = await this.locateWithHealing(target, 'check', { timeout });
 
 		await this.ensureActionable(located, 'check', target, { timeout });
 
@@ -337,7 +353,7 @@ export class Page {
 	 */
 	async uncheck(target: ElementTarget, options?: ClickOptions): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const located = await locateElement(this.session, this.contextId, target, { timeout });
+		const located = await this.locateWithHealing(target, 'uncheck', { timeout });
 
 		await this.ensureActionable(located, 'uncheck', target, { timeout });
 
@@ -369,7 +385,7 @@ export class Page {
 	 */
 	async hover(target: ElementTarget, options?: { timeout?: number }): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const located = await locateElement(this.session, this.contextId, target, { timeout });
+		const located = await this.locateWithHealing(target, 'hover', { timeout });
 
 		await this.ensureActionable(located, 'hover', target, { timeout });
 
@@ -782,7 +798,7 @@ export class Page {
 	 */
 	async tap(target: ElementTarget, options?: { timeout?: number }): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const located = await locateElement(this.session, this.contextId, target, { timeout });
+		const located = await this.locateWithHealing(target, 'tap', { timeout });
 
 		await this.ensureActionable(located, 'tap', target, { timeout });
 
@@ -827,7 +843,7 @@ export class Page {
 		const timeout = options?.timeout ?? this.config.timeout;
 		const resolvedTarget: ElementTarget =
 			typeof target === 'string' ? { label: target, name: target } : target;
-		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
+		const located = await this.locateWithHealing(resolvedTarget, 'focus', { timeout });
 
 		await this.ensureActionable(located, 'focus', target, { timeout, enabled: false });
 
@@ -852,7 +868,7 @@ export class Page {
 		const timeout = options?.timeout ?? this.config.timeout;
 		const resolvedTarget: ElementTarget =
 			typeof target === 'string' ? { label: target, name: target } : target;
-		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
+		const located = await this.locateWithHealing(resolvedTarget, 'blur', { timeout });
 		const ref = this.getSharedRef(located.node);
 
 		await this.session.script.callFunction({
@@ -872,7 +888,7 @@ export class Page {
 	 */
 	async innerText(target: ElementTarget, options?: { timeout?: number }): Promise<string> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const located = await locateElement(this.session, this.contextId, target, { timeout });
+		const located = await this.locateWithHealing(target, 'innerText', { timeout });
 		const ref = this.getSharedRef(located.node);
 
 		const result = await this.session.script.callFunction({
@@ -894,7 +910,7 @@ export class Page {
 	 */
 	async innerHTML(target: ElementTarget, options?: { timeout?: number }): Promise<string> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const located = await locateElement(this.session, this.contextId, target, { timeout });
+		const located = await this.locateWithHealing(target, 'innerHTML', { timeout });
 		const ref = this.getSharedRef(located.node);
 
 		const result = await this.session.script.callFunction({
@@ -918,7 +934,7 @@ export class Page {
 		const timeout = options?.timeout ?? this.config.timeout;
 		const resolvedTarget: ElementTarget =
 			typeof target === 'string' ? { label: target, name: target } : target;
-		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
+		const located = await this.locateWithHealing(resolvedTarget, 'inputValue', { timeout });
 		const ref = this.getSharedRef(located.node);
 
 		const result = await this.session.script.callFunction({
@@ -946,7 +962,7 @@ export class Page {
 		const timeout = options?.timeout ?? this.config.timeout;
 		const resolvedTarget: ElementTarget =
 			typeof target === 'string' ? { label: target, name: target } : target;
-		const located = await locateElement(this.session, this.contextId, resolvedTarget, { timeout });
+		const located = await this.locateWithHealing(resolvedTarget, 'selectOption', { timeout });
 
 		await this.ensureActionable(located, 'selectOption', target, { timeout });
 
@@ -1026,7 +1042,7 @@ export class Page {
 		target: ElementTarget,
 		options?: { timeout?: number; state?: 'attached' | 'visible' | 'hidden' },
 	): Promise<ElementHandle> {
-		const timeout = options?.timeout ?? this.config.timeout;
+		const timeout = this.adaptTimeout(options?.timeout ?? this.config.timeout);
 		const state = options?.state ?? 'visible';
 
 		if (state === 'hidden') {
@@ -1185,8 +1201,8 @@ export class Page {
 		const timeout = options?.timeout ?? this.config.timeout;
 		const startTime = Date.now();
 
-		// Step 1: Locate the element (auto-waits for it to exist in DOM)
-		const located = await locateElement(this.session, this.contextId, target, { timeout });
+		// Step 1: Locate the element (auto-waits for it to exist in DOM, self-heals if needed)
+		const located = await this.locateWithHealing(target, 'see', { timeout });
 		const ref = this.getSharedRef(located.node);
 
 		// Step 2: Poll until the element is visible (handles CSS transitions, lazy rendering, etc.)
@@ -1451,9 +1467,188 @@ export class Page {
 	// -----------------------------------------------------------------------
 
 	/**
+	 * Locate an element with automatic self-healing on failure.
+	 *
+	 * When locateElement() throws ElementNotFoundError, this method:
+	 * 1. Captures a lightweight DOM snapshot of the page
+	 * 2. Calls healSelector() to find a likely replacement
+	 * 3. If healed, retries with the new selector and logs a warning
+	 *
+	 * Zero user configuration. Zero new API. Just smarter element finding.
+	 */
+	private async locateWithHealing(
+		target: ElementTarget,
+		action: string,
+		options: { timeout: number },
+	): Promise<LocatedElement> {
+		const adaptedOptions = { timeout: this.adaptTimeout(options.timeout) };
+		try {
+			return await locateElement(this.session, this.contextId, target, adaptedOptions);
+		} catch (err) {
+			// Only attempt healing for ElementNotFoundError with CSS/testId selectors
+			if (!(err instanceof ElementNotFoundError)) throw err;
+
+			// Only heal selector-based targets (not text/role — those don't "break")
+			const selectorText = this.extractSelector(target);
+			if (!selectorText) throw err;
+
+			try {
+				// Dynamically import self-healing (browsecraft-ai is optional)
+				// Use a variable so TypeScript doesn't try to resolve the module at build time
+				const aiPkg = 'browsecraft-ai';
+				// biome-ignore lint/suspicious/noExplicitAny: optional dynamic import
+				const { healSelector } = (await import(aiPkg)) as any;
+
+				const snapshot = await this.captureSnapshot();
+				const aiConfig = resolveAIConfig(this.config.ai);
+
+				const result = await healSelector(selectorText, snapshot, {
+					context: `${action} action on ${typeof target === 'string' ? target : selectorText}`,
+					useAI: aiConfig !== null,
+					provider: aiConfig
+						? {
+								provider: aiConfig.provider,
+								token:
+									'token' in aiConfig ? (aiConfig as { token?: string }).token : undefined,
+								baseUrl:
+									'baseUrl' in aiConfig
+										? (aiConfig as { baseUrl?: string }).baseUrl
+										: undefined,
+							}
+						: undefined,
+				});
+
+				if (result.healed && result.selector) {
+					// Log warning so users know and can update their selectors
+					console.warn(
+						`\u26A0 [browsecraft] Self-healed: '${selectorText}' \u2192 '${result.selector}' (${result.method}, ${(result.confidence * 100).toFixed(0)}% confidence)`,
+					);
+
+					// Retry with the healed selector
+					return await locateElement(
+						this.session,
+						this.contextId,
+						{ selector: result.selector },
+						adaptedOptions,
+					);
+				}
+			} catch {
+				// Self-healing failed or browsecraft-ai not available — throw original error
+			}
+
+			throw err;
+		}
+	}
+
+	/**
+	 * Capture a lightweight DOM snapshot for self-healing.
+	 * Extracts interactive elements with their attributes for matching.
+	 */
+	private async captureSnapshot(): Promise<{
+		url: string;
+		title: string;
+		elements: Array<{
+			tag: string;
+			id?: string;
+			classes?: string[];
+			text?: string;
+			ariaLabel?: string;
+			role?: string;
+			type?: string;
+			name?: string;
+			placeholder?: string;
+			href?: string;
+			testId?: string;
+			selector: string;
+		}>;
+	}> {
+		const [url, title] = await Promise.all([this.url(), this.title()]);
+
+		const result = await this.session.script.callFunction({
+			functionDeclaration: `function() {
+				const selectors = 'button, a, input, select, textarea, [role], [data-testid], [data-test-id], [aria-label], label, h1, h2, h3, h4, h5, h6, img, nav, form';
+				const els = document.querySelectorAll(selectors);
+				const elements = [];
+
+				for (const el of els) {
+					if (elements.length >= 100) break;
+
+					const rect = el.getBoundingClientRect();
+					if (rect.width === 0 && rect.height === 0) continue;
+
+					const id = el.id || undefined;
+					const classes = el.className && typeof el.className === 'string'
+						? el.className.split(/\\s+/).filter(Boolean)
+						: undefined;
+					const text = (el.innerText || '').trim().slice(0, 200) || undefined;
+					const ariaLabel = el.getAttribute('aria-label') || undefined;
+					const role = el.getAttribute('role') || undefined;
+					const type = el.getAttribute('type') || undefined;
+					const name = el.getAttribute('name') || undefined;
+					const placeholder = el.getAttribute('placeholder') || undefined;
+					const href = el.tagName === 'A' ? el.getAttribute('href') || undefined : undefined;
+					const testId = el.getAttribute('data-testid') || el.getAttribute('data-test-id') || undefined;
+
+					// Generate a unique selector
+					let selector;
+					if (id) selector = '#' + id;
+					else if (testId) selector = '[data-testid="' + testId + '"]';
+					else {
+						const tag = el.tagName.toLowerCase();
+						const nth = Array.from(el.parentNode?.children || []).indexOf(el);
+						selector = tag + (classes && classes.length ? '.' + classes[0] : '') + ':nth-child(' + (nth + 1) + ')';
+					}
+
+					elements.push({
+						tag: el.tagName.toLowerCase(),
+						id, classes, text, ariaLabel, role, type, name, placeholder, href, testId, selector
+					});
+				}
+				return elements;
+			}`,
+			target: { context: this.contextId },
+			awaitPromise: false,
+		});
+
+		let elements: Array<{ tag: string; selector: string; [key: string]: unknown }> = [];
+		if (result.type === 'success' && result.result?.type === 'array') {
+			const arr = result.result.value as unknown[];
+			elements = arr
+				.map((item) => this.deserializeRemoteValue(item))
+				.filter((e): e is { tag: string; selector: string; [key: string]: unknown } =>
+					e !== null && typeof e === 'object' && 'tag' in e && 'selector' in e,
+				);
+		}
+
+		return { url, title, elements };
+	}
+
+	/**
+	 * Extract a CSS selector string from a target, if applicable.
+	 * Only returns a value for selector-based or CSS-like targets.
+	 */
+	private extractSelector(target: ElementTarget): string | null {
+		if (typeof target === 'string') {
+			// If it looks like a CSS selector (starts with # . [ or contains :)
+			return target.match(/^[#.\[]/) || target.includes(':') ? target : null;
+		}
+		return target.selector ?? target.testId ? `[data-testid="${target.testId}"]` : null;
+	}
+
+	/**
 	 * Ensure an element is actionable (visible + enabled) before interacting.
 	 * Throws a rich ElementNotActionableError if it's not ready within the timeout.
 	 */
+	/**
+	 * Apply the adaptive timing multiplier to a timeout.
+	 * On slow environments, timeouts automatically scale up so tests don't
+	 * flake. On fast machines the multiplier stays 1.0 — no overhead.
+	 * @internal
+	 */
+	private adaptTimeout(ms: number): number {
+		return Math.round(ms * this.timingMultiplier);
+	}
+
 	private async ensureActionable(
 		located: LocatedElement,
 		action: string,
@@ -1468,7 +1663,7 @@ export class Page {
 			this.contextId,
 			ref,
 			targetDesc,
-			{ timeout: Math.min(options.timeout, 5000) },
+			{ timeout: this.adaptTimeout(Math.min(options.timeout, 5000)) },
 			{
 				visible: true,
 				enabled: options.enabled !== false,

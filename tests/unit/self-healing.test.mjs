@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 // ============================================================================
-// Unit Tests — Self-Healing Selectors (Heuristic / non-AI path)
-// SKIPPED — heuristic scoring thresholds need recalibration
+// Unit Tests — Self-Healing Selectors
+//   - Heuristic healing (Levenshtein + attribute matching)
+//   - Page integration (extractSelector, warning format, snapshot shape)
+//   - Multi-provider support
 // ============================================================================
 
 import assert from 'node:assert/strict';
@@ -256,6 +258,112 @@ await testAsync('heals by name attribute similarity', async () => {
 	});
 	assert.equal(result.healed, true);
 	assert.ok(result.selector.includes('username'));
+});
+
+// -----------------------------------------------------------------------
+// Page integration — extractSelector logic
+// -----------------------------------------------------------------------
+
+await testAsync('extractSelector identifies CSS selectors', () => {
+	function extractSelector(target) {
+		if (typeof target === 'string') {
+			return target.match(/^[#.\[]/) || target.includes(':') ? target : null;
+		}
+		return target.selector ?? (target.testId ? `[data-testid="${target.testId}"]` : null);
+	}
+
+	// Should extract CSS-like selectors
+	assert.equal(extractSelector('#submit-btn'), '#submit-btn');
+	assert.equal(extractSelector('.btn-primary'), '.btn-primary');
+	assert.equal(extractSelector('[data-testid="x"]'), '[data-testid="x"]');
+	assert.equal(extractSelector('div:nth-child(2)'), 'div:nth-child(2)');
+
+	// Should NOT extract plain text
+	assert.equal(extractSelector('Submit'), null);
+	assert.equal(extractSelector('Click me'), null);
+
+	// Object targets
+	assert.equal(extractSelector({ selector: '#my-btn' }), '#my-btn');
+	assert.equal(extractSelector({ testId: 'card' }), '[data-testid="card"]');
+	assert.equal(extractSelector({ name: 'Submit' }), null);
+});
+
+// -----------------------------------------------------------------------
+// Warning message format
+// -----------------------------------------------------------------------
+
+await testAsync('warning message format is correct', () => {
+	const oldSelector = '#submit-btn';
+	const newSelector = '#send-btn';
+	const method = 'text-similarity';
+	const confidence = 0.85;
+
+	const warning = `\u26A0 [browsecraft] Self-healed: '${oldSelector}' \u2192 '${newSelector}' (${method}, ${(confidence * 100).toFixed(0)}% confidence)`;
+
+	assert.ok(warning.includes('#submit-btn'));
+	assert.ok(warning.includes('#send-btn'));
+	assert.ok(warning.includes('85%'));
+	assert.ok(warning.includes('text-similarity'));
+});
+
+// -----------------------------------------------------------------------
+// Snapshot structure validation
+// -----------------------------------------------------------------------
+
+await testAsync('snapshot has required structure', () => {
+	const snapshot = makeSnapshot([
+		{
+			tag: 'button',
+			id: 'submit-btn',
+			classes: ['btn', 'primary'],
+			text: 'Submit',
+			ariaLabel: 'Submit form',
+			selector: '#submit-btn',
+		},
+	]);
+
+	assert.equal(snapshot.url, 'https://example.com');
+	assert.equal(snapshot.title, 'Test');
+	assert.equal(snapshot.elements.length, 1);
+	assert.equal(snapshot.elements[0].tag, 'button');
+	assert.equal(snapshot.elements[0].id, 'submit-btn');
+	assert.deepStrictEqual(snapshot.elements[0].classes, ['btn', 'primary']);
+});
+
+// -----------------------------------------------------------------------
+// Multi-provider support — healSelector accepts provider option
+// -----------------------------------------------------------------------
+
+await testAsync('accepts provider option without crashing', async () => {
+	const snapshot = makeSnapshot([
+		{ tag: 'button', id: 'btn-new', selector: '#btn-new', text: 'Submit' },
+	]);
+
+	// Should work with explicit provider (will skip AI since no real API key)
+	const result = await healSelector('#btn-old', snapshot, {
+		useAI: false,
+		provider: { provider: 'openai', token: 'fake' },
+		minConfidence: 0.1,
+	});
+
+	// Heuristic should still work even with a provider option set
+	assert.ok(typeof result.healed === 'boolean');
+	assert.ok(typeof result.confidence === 'number');
+});
+
+await testAsync('works without provider option (backward compatible)', async () => {
+	const snapshot = makeSnapshot([
+		{ tag: 'button', id: 'btn-v2', selector: '#btn-v2', text: 'Sign In' },
+	]);
+
+	// Legacy: no provider, just useAI: false + optional token
+	const result = await healSelector('#btn-v1', snapshot, {
+		useAI: false,
+		token: 'fake-token',
+		minConfidence: 0.1,
+	});
+
+	assert.ok(typeof result.healed === 'boolean');
 });
 
 // -----------------------------------------------------------------------

@@ -11,6 +11,7 @@ import {
 	ElementNotFoundError,
 	NetworkError,
 	TimeoutError,
+	classifyFailure,
 } from '../../packages/browsecraft/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
@@ -313,6 +314,129 @@ test('element state shows bounding box', () => {
 	});
 	assert.ok(err.message.includes('(10, 20)'));
 	assert.ok(err.message.includes('100x50'));
+});
+
+// -----------------------------------------------------------------------
+// classifyFailure — failure classification
+// -----------------------------------------------------------------------
+
+test('classifies ElementNotFoundError as element + retryable', () => {
+	const err = new ElementNotFoundError({
+		action: 'click',
+		target: '#btn',
+	});
+	const c = classifyFailure(err);
+	assert.equal(c.category, 'element');
+	assert.equal(c.retryable, true);
+});
+
+test('classifies ElementNotActionableError as actionability + retryable', () => {
+	const err = new ElementNotActionableError({
+		action: 'click',
+		target: '#btn',
+		reason: 'disabled',
+		elementState: { found: true, enabled: false },
+	});
+	const c = classifyFailure(err);
+	assert.equal(c.category, 'actionability');
+	assert.equal(c.retryable, true);
+});
+
+test('classifies NetworkError as network + retryable', () => {
+	const err = new NetworkError({
+		action: 'goto',
+		target: 'https://example.com',
+		message: 'connection refused',
+	});
+	const c = classifyFailure(err);
+	assert.equal(c.category, 'network');
+	assert.equal(c.retryable, true);
+});
+
+test('classifies TimeoutError as timeout + retryable', () => {
+	const err = new TimeoutError({
+		action: 'click',
+		target: 'Submit',
+		message: 'timed out',
+	});
+	const c = classifyFailure(err);
+	assert.equal(c.category, 'timeout');
+	assert.equal(c.retryable, true);
+});
+
+test('classifies SyntaxError as script + NOT retryable', () => {
+	const c = classifyFailure(new SyntaxError('unexpected token'));
+	assert.equal(c.category, 'script');
+	assert.equal(c.retryable, false);
+});
+
+test('classifies TypeError as script + NOT retryable', () => {
+	const c = classifyFailure(new TypeError('x is not a function'));
+	assert.equal(c.category, 'script');
+	assert.equal(c.retryable, false);
+});
+
+test('classifies ReferenceError as script + NOT retryable', () => {
+	const c = classifyFailure(new ReferenceError('x is not defined'));
+	assert.equal(c.category, 'script');
+	assert.equal(c.retryable, false);
+});
+
+test('classifies assertion-like message as assertion + NOT retryable', () => {
+	const err = new Error('Expected 3 to equal 5');
+	const c = classifyFailure(err);
+	assert.equal(c.category, 'assertion');
+	assert.equal(c.retryable, false);
+});
+
+test('classifies "expected to have" message as assertion', () => {
+	const err = new Error('Expected page to have title "Home"');
+	const c = classifyFailure(err);
+	assert.equal(c.category, 'assertion');
+	assert.equal(c.retryable, false);
+});
+
+test('classifies generic timeout message as timeout + retryable', () => {
+	const err = new Error('Timed out after 30000ms');
+	const c = classifyFailure(err);
+	assert.equal(c.category, 'timeout');
+	assert.equal(c.retryable, true);
+});
+
+test('classifies ECONNREFUSED as network + retryable', () => {
+	const err = new Error('connect ECONNREFUSED 127.0.0.1:3000');
+	const c = classifyFailure(err);
+	assert.equal(c.category, 'network');
+	assert.equal(c.retryable, true);
+});
+
+test('classifies unknown error as unknown + retryable', () => {
+	const err = new Error('something weird happened');
+	const c = classifyFailure(err);
+	assert.equal(c.category, 'unknown');
+	assert.equal(c.retryable, true);
+});
+
+test('classifies non-Error thrown as unknown + retryable', () => {
+	const c = classifyFailure('just a string');
+	assert.equal(c.category, 'unknown');
+	assert.equal(c.retryable, true);
+});
+
+test('classification always returns required fields', () => {
+	for (const err of [
+		new Error('test'),
+		new TypeError('bad'),
+		new SyntaxError('oops'),
+		null,
+		undefined,
+		42,
+	]) {
+		const c = classifyFailure(err);
+		assert.ok(typeof c.category === 'string');
+		assert.ok(typeof c.retryable === 'boolean');
+		assert.ok(typeof c.description === 'string');
+	}
 });
 
 // -----------------------------------------------------------------------

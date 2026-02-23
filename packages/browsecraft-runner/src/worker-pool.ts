@@ -13,6 +13,7 @@
 // ============================================================================
 
 import type { BrowserName, EventBus, WorkItem, WorkItemResult, WorkerInfo } from './event-bus.js';
+import { classifyFailure } from './smart-retry.js';
 
 // ---------------------------------------------------------------------------
 // Worker State
@@ -311,27 +312,30 @@ export class WorkerPool {
 					error: execResult.error,
 				};
 
-				// Handle retries for failures
+				// Smart retry — skip retries for non-retryable (deterministic) failures
 				if (execResult.status === 'failed' && this.config.maxRetries > 0) {
-					let attempt = 1;
-					while (attempt <= this.config.maxRetries && finalResult.status === 'failed') {
-						this.bus.emit('item:retry', {
-							item,
-							worker: worker.info,
-							attempt,
-							maxRetries: this.config.maxRetries,
-						});
+					const classification = classifyFailure(execResult.error);
+					if (classification.retryable) {
+						let attempt = 1;
+						while (attempt <= this.config.maxRetries && finalResult.status === 'failed') {
+							this.bus.emit('item:retry', {
+								item,
+								worker: worker.info,
+								attempt,
+								maxRetries: this.config.maxRetries,
+							});
 
-						const retryResult = await executor(item, worker.info);
-						finalResult = {
-							item,
-							worker: worker.info,
-							status: retryResult.status,
-							duration: retryResult.duration,
-							error: retryResult.error,
-							retries: attempt,
-						};
-						attempt++;
+							const retryResult = await executor(item, worker.info);
+							finalResult = {
+								item,
+								worker: worker.info,
+								status: retryResult.status,
+								duration: retryResult.duration,
+								error: retryResult.error,
+								retries: attempt,
+							};
+							attempt++;
+						}
 					}
 				}
 			} catch (err) {

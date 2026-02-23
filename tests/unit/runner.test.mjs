@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { TestRunner } from '../../packages/browsecraft-runner/dist/index.js';
+import { classifyFailure } from '../../packages/browsecraft-runner/dist/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -344,6 +345,48 @@ await testAsync('run bails after first failure when bail=true', async () => {
 
 	// Should only execute tests for the first file, bail on second
 	assert.equal(executions.length, 1);
+});
+
+// -----------------------------------------------------------------------
+// Smart Retry — classifyFailure (from browsecraft-runner)
+// -----------------------------------------------------------------------
+
+test('classifyFailure: TypeError is not retryable', () => {
+	const c = classifyFailure(new TypeError('undefined is not a function'));
+	assert.equal(c.category, 'script');
+	assert.equal(c.retryable, false);
+});
+
+test('classifyFailure: generic timeout is retryable', () => {
+	const c = classifyFailure(new Error('Timed out after 30000ms'));
+	assert.equal(c.category, 'timeout');
+	assert.equal(c.retryable, true);
+});
+
+test('classifyFailure: assertion pattern is not retryable', () => {
+	const c = classifyFailure(new Error('Expected 5 to equal 3'));
+	assert.equal(c.category, 'assertion');
+	assert.equal(c.retryable, false);
+});
+
+test('classifyFailure: ECONNRESET is retryable', () => {
+	const c = classifyFailure(new Error('read ECONNRESET'));
+	assert.equal(c.category, 'network');
+	assert.equal(c.retryable, true);
+});
+
+test('classifyFailure: unknown error defaults to retryable', () => {
+	const c = classifyFailure(new Error('something happened'));
+	assert.equal(c.category, 'unknown');
+	assert.equal(c.retryable, true);
+});
+
+test('classifyFailure: error by name (ElementNotFoundError)', () => {
+	const err = new Error('element not found');
+	err.name = 'ElementNotFoundError';
+	const c = classifyFailure(err);
+	assert.equal(c.category, 'element');
+	assert.equal(c.retryable, true);
 });
 
 // -----------------------------------------------------------------------

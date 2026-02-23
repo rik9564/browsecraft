@@ -823,6 +823,9 @@ export class BddExecutor {
 				logs,
 			};
 
+			// AI diagnosis — best-effort, never blocks the test run
+			await this.tryDiagnose(step, error, logs);
+
 			hookContext.error = error;
 			try {
 				await this.hooks.runHooks('afterStep', hookContext);
@@ -892,6 +895,29 @@ export class BddExecutor {
 
 		const lines = suggestions.map((s) => `  - ${s.pattern}`);
 		return `\nDid you mean:\n${lines.join('\n')}`;
+	}
+
+	/**
+	 * Attempt AI diagnosis of a failed step. Best-effort — never throws,
+	 * never blocks the test run. Appends diagnosis to the step's logs.
+	 */
+	private async tryDiagnose(step: Step, error: Error, logs: string[]): Promise<void> {
+		try {
+			const { diagnoseFailure } = await import('browsecraft-ai');
+			const diagnosis = await diagnoseFailure({
+				stepText: `${step.keyword} ${step.text}`,
+				errorMessage: error.message,
+				errorName: error.name,
+			});
+
+			if (diagnosis) {
+				logs.push(
+					`[AI Diagnosis] ${diagnosis.rootCause} → ${diagnosis.suggestion} (${diagnosis.likelySource}, ${(diagnosis.confidence * 100).toFixed(0)}%)`,
+				);
+			}
+		} catch {
+			// browsecraft-ai not installed or diagnosis failed — silently skip
+		}
 	}
 }
 

@@ -34,3 +34,8 @@ export {
 	type VisualDiffResult,
 	type VisualDiffOptions,
 } from './visual-diff.js';
+export {
+	diagnoseFailure,
+	type DiagnosisContext,
+	type Diagnosis,
+} from './diagnose.js';

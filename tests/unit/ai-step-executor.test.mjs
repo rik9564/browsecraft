@@ -442,6 +442,79 @@ Feature: Multi-step timeout
 });
 
 // =========================================================================
+// Persistent Cache, Confidence Gate, Locked Mode
+// =========================================================================
+
+console.log('\n  \x1b[2mPersistent cache & modes\x1b[0m');
+
+test('accepts cachePath config', () => {
+	const executor = createAIStepExecutor({
+		cachePath: '.browsecraft/test-cache.json',
+	});
+	assert.ok(executor instanceof AIStepExecutor);
+});
+
+test('cachePath null disables persistence', () => {
+	const executor = createAIStepExecutor({
+		cachePath: null,
+	});
+	assert.ok(executor instanceof AIStepExecutor);
+});
+
+test('accepts confidenceThreshold config', () => {
+	const executor = createAIStepExecutor({
+		confidenceThreshold: 0.9,
+	});
+	assert.ok(executor instanceof AIStepExecutor);
+});
+
+test('default mode is auto', () => {
+	const executor = createAIStepExecutor();
+	assert.equal(executor.mode, 'auto');
+});
+
+test('accepts locked mode', () => {
+	const executor = createAIStepExecutor({
+		cacheMode: 'locked',
+	});
+	assert.equal(executor.mode, 'locked');
+});
+
+test('accepts warm mode', () => {
+	const executor = createAIStepExecutor({
+		cacheMode: 'warm',
+	});
+	assert.equal(executor.mode, 'warm');
+});
+
+await testAsync('locked mode returns error for uncached step', async () => {
+	const executor = createAIStepExecutor({
+		cacheMode: 'locked',
+		cachePath: null, // no disk cache to load
+	});
+
+	const result = await executor.executeStep('I click "Submit"', 'When', {});
+	assert.equal(result.handled, false);
+	assert.ok(result.error);
+	assert.ok(result.error.message.includes('locked mode'));
+	assert.ok(result.error.message.includes('no cached plan') || result.error.message.includes('No cached plan'));
+});
+
+test('full config with all new options', () => {
+	const executor = createAIStepExecutor({
+		provider: { provider: 'openai', token: 'sk-test' },
+		cachePath: '/tmp/test-cache.json',
+		confidenceThreshold: 0.95,
+		cacheMode: 'warm',
+		cacheSize: 100,
+		debug: true,
+	});
+	assert.ok(executor instanceof AIStepExecutor);
+	assert.equal(executor.provider, 'openai');
+	assert.equal(executor.mode, 'warm');
+});
+
+// =========================================================================
 // Summary
 // =========================================================================
 

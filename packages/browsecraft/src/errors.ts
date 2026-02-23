@@ -188,6 +188,149 @@ export class TimeoutError extends BrowsecraftError {
 }
 
 // ---------------------------------------------------------------------------
+// Failure Classification — algorithmic, zero-AI, zero-config
+// ---------------------------------------------------------------------------
+
+/**
+ * Categories of failures. Used by smart retry to decide whether retrying
+ * the same action is worthwhile.
+ */
+export type FailureCategory =
+	| 'element'
+	| 'actionability'
+	| 'timeout'
+	| 'network'
+	| 'assertion'
+	| 'script'
+	| 'unknown';
+
+export interface FailureClassification {
+	/** High-level category */
+	category: FailureCategory;
+	/** Whether retrying this failure is likely to succeed */
+	retryable: boolean;
+	/** Human-readable one-liner */
+	description: string;
+}
+
+/**
+ * Classify an error into a category and decide if it's retryable.
+ *
+ * This is pure algorithmic pattern matching — no AI, no config.
+ * The runner uses this to skip retries for deterministic failures
+ * (e.g., assertion errors) and only retry intermittent ones.
+ */
+export function classifyFailure(error: unknown): FailureClassification {
+	if (!(error instanceof Error)) {
+		return { category: 'unknown', retryable: true, description: 'Non-Error thrown' };
+	}
+
+	// Browsecraft typed errors — most specific first
+	if (error instanceof ElementNotFoundError) {
+		return {
+			category: 'element',
+			retryable: true,
+			description: 'Element not found — page may still be loading or selector changed',
+		};
+	}
+
+	if (error instanceof ElementNotActionableError) {
+		return {
+			category: 'actionability',
+			retryable: true,
+			description: `Element not actionable (${error.reason}) — may become ready`,
+		};
+	}
+
+	if (error instanceof NetworkError) {
+		return {
+			category: 'network',
+			retryable: true,
+			description: 'Network failure — may be transient',
+		};
+	}
+
+	if (error instanceof TimeoutError) {
+		return {
+			category: 'timeout',
+			retryable: true,
+			description: 'Timed out — environment may be slow or element delayed',
+		};
+	}
+
+	// Node built-in assertion errors — NEVER retry (test logic is wrong)
+	const name = error.name ?? '';
+	if (
+		name === 'AssertionError' ||
+		name === 'AssertionError [ERR_ASSERTION]' ||
+		name === 'ERR_ASSERTION' ||
+		error.constructor?.name === 'AssertionError'
+	) {
+		return {
+			category: 'assertion',
+			retryable: false,
+			description: 'Assertion failed — retrying won\'t help',
+		};
+	}
+
+	// Pattern match on message for common non-retryable errors
+	const msg = error.message ?? '';
+	const lowerMsg = msg.toLowerCase();
+
+	// Assertion-like patterns (from various test frameworks)
+	if (
+		lowerMsg.includes('expected') && (lowerMsg.includes('to equal') || lowerMsg.includes('to be') || lowerMsg.includes('to have') || lowerMsg.includes('to match') || lowerMsg.includes('to contain') || lowerMsg.includes('but got') || lowerMsg.includes('but received'))
+	) {
+		return {
+			category: 'assertion',
+			retryable: false,
+			description: 'Assertion failed — retrying won\'t help',
+		};
+	}
+
+	// Script / syntax / reference errors — code bugs, never retry
+	if (
+		name === 'SyntaxError' ||
+		name === 'ReferenceError' ||
+		name === 'TypeError' ||
+		name === 'RangeError'
+	) {
+		return {
+			category: 'script',
+			retryable: false,
+			description: `${name} — likely a code bug, retrying won't help`,
+		};
+	}
+
+	// Timeout patterns from generic errors
+	if (lowerMsg.includes('timed out') || lowerMsg.includes('timeout')) {
+		return {
+			category: 'timeout',
+			retryable: true,
+			description: 'Timed out — environment may be slow',
+		};
+	}
+
+	// Network patterns from generic errors
+	if (
+		lowerMsg.includes('econnrefused') ||
+		lowerMsg.includes('econnreset') ||
+		lowerMsg.includes('enotfound') ||
+		lowerMsg.includes('fetch failed') ||
+		lowerMsg.includes('network')
+	) {
+		return {
+			category: 'network',
+			retryable: true,
+			description: 'Network failure — may be transient',
+		};
+	}
+
+	// Default: unknown but retryable (give it a chance)
+	return { category: 'unknown', retryable: true, description: 'Unknown error — will retry' };
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
