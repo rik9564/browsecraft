@@ -90,7 +90,7 @@ export interface RunnerEvents {
 	};
 
 	// Progress
-	'progress': {
+	progress: {
 		completed: number;
 		total: number;
 		passed: number;

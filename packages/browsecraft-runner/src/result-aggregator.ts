@@ -10,10 +10,7 @@
 // - Summary suitable for CLI console, JSON, or HTML reporters
 // ============================================================================
 
-import type {
-	BrowserName,
-	WorkItemResult,
-} from './event-bus.js';
+import type { BrowserName, WorkItemResult } from './event-bus.js';
 
 import type { SchedulerResult } from './scheduler.js';
 
@@ -130,7 +127,10 @@ export class ResultAggregator {
 		const { allResults, browsers: browserResults, strategy, totalDuration } = result;
 
 		// Build matrix
-		const matrix = this.buildMatrix(allResults, browserResults.map((b) => b.browser));
+		const matrix = this.buildMatrix(
+			allResults,
+			browserResults.map((b) => b.browser),
+		);
 
 		// Browser summaries
 		const browserSummaries = browserResults.map((b) => ({
@@ -156,9 +156,7 @@ export class ResultAggregator {
 		};
 
 		// Timing
-		const allDurations = allResults
-			.filter((r) => r.status !== 'skipped')
-			.map((r) => r.duration);
+		const allDurations = allResults.filter((r) => r.status !== 'skipped').map((r) => r.duration);
 		const timing = this.computeTimingStats(allDurations);
 
 		// Notable tests
@@ -240,14 +238,14 @@ export class ResultAggregator {
 
 			// Check cross-browser consistency
 			const statuses = new Set(
-				[...browserMap.values()]
-					.filter((c) => c.status !== 'not-run')
-					.map((c) => c.status),
+				[...browserMap.values()].filter((c) => c.status !== 'not-run').map((c) => c.status),
 			);
 			const crossBrowserInconsistent = statuses.size > 1;
 
 			// Check for flaky tests (passed after retries)
-			const flaky = itemResults.some((r) => r.retries !== undefined && r.retries > 0 && r.status === 'passed');
+			const flaky = itemResults.some(
+				(r) => r.retries !== undefined && r.retries > 0 && r.status === 'passed',
+			);
 
 			rows.push({
 				id,
@@ -311,11 +309,15 @@ export class ResultAggregator {
 				const cell = row.browsers.get(browser);
 				if (!cell || cell.status === 'not-run') return '  -     '.padEnd(10);
 
-				const icon = cell.status === 'passed' ? '\x1b[32m✓\x1b[0m'
-					: cell.status === 'failed' ? '\x1b[31m✗\x1b[0m'
-					: '\x1b[33m-\x1b[0m';
+				const icon =
+					cell.status === 'passed'
+						? '\x1b[32m✓\x1b[0m'
+						: cell.status === 'failed'
+							? '\x1b[31m✗\x1b[0m'
+							: '\x1b[33m-\x1b[0m';
 
-				const time = cell.duration < 1000 ? `${cell.duration}ms` : `${(cell.duration / 1000).toFixed(1)}s`;
+				const time =
+					cell.duration < 1000 ? `${cell.duration}ms` : `${(cell.duration / 1000).toFixed(1)}s`;
 				return `${icon} ${time}`.padEnd(10);
 			});
 
@@ -325,7 +327,7 @@ export class ResultAggregator {
 
 		// Footer
 		lines.push('');
-		lines.push(`  Legend: ✓ passed  ✗ failed  - skipped  🔄 flaky  ⚠️  inconsistent`);
+		lines.push('  Legend: ✓ passed  ✗ failed  - skipped  🔄 flaky  ⚠️  inconsistent');
 		lines.push('');
 
 		return lines.join('\n');
@@ -348,7 +350,9 @@ export class ResultAggregator {
 			if (bs.passed > 0) parts.push(`\x1b[32m${bs.passed} ✓\x1b[0m`);
 			if (bs.failed > 0) parts.push(`\x1b[31m${bs.failed} ✗\x1b[0m`);
 			if (bs.skipped > 0) parts.push(`\x1b[33m${bs.skipped} -\x1b[0m`);
-			lines.push(`  ${bs.browser.padEnd(10)} ${parts.join('  ')}  (${this.formatDuration(bs.duration)})`);
+			lines.push(
+				`  ${bs.browser.padEnd(10)} ${parts.join('  ')}  (${this.formatDuration(bs.duration)})`,
+			);
 		}
 
 		lines.push('  ───────────────────────────────────────');
@@ -368,7 +372,9 @@ export class ResultAggregator {
 			lines.push(`  ⚠️  Cross-browser inconsistencies: ${totals.crossBrowserInconsistent}`);
 		}
 
-		lines.push(`  Timing:   avg ${this.formatDuration(timing.avg)} · p95 ${this.formatDuration(timing.p95)} · max ${this.formatDuration(timing.max)}`);
+		lines.push(
+			`  Timing:   avg ${this.formatDuration(timing.avg)} · p95 ${this.formatDuration(timing.p95)} · max ${this.formatDuration(timing.max)}`,
+		);
 		lines.push(`  Duration: ${this.formatDuration(totalDuration)}`);
 		lines.push('  ═══════════════════════════════════════');
 		lines.push('');

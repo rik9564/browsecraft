@@ -12,13 +12,7 @@
 //   2 Chrome + 1 Firefox + 1 Edge = 4 workers total
 // ============================================================================
 
-import type {
-	BrowserName,
-	EventBus,
-	WorkItem,
-	WorkItemResult,
-	WorkerInfo,
-} from './event-bus.js';
+import type { BrowserName, EventBus, WorkItem, WorkItemResult, WorkerInfo } from './event-bus.js';
 
 // ---------------------------------------------------------------------------
 // Worker State

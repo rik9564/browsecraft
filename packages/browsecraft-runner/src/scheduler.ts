@@ -14,12 +14,7 @@
 // - Collects and returns the complete result matrix
 // ============================================================================
 
-import type {
-	BrowserName,
-	EventBus,
-	WorkItem,
-	WorkItemResult,
-} from './event-bus.js';
+import type { BrowserName, EventBus, WorkItem, WorkItemResult } from './event-bus.js';
 
 import type { WorkItemExecutor, WorkerPool } from './worker-pool.js';
 
