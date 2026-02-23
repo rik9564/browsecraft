@@ -676,6 +676,172 @@ if (diagnoseFailure) {
 }
 
 // -----------------------------------------------------------------------
+// Parallel BDD — computeSummary merges multiple feature results
+// -----------------------------------------------------------------------
+
+test('computeSummary merges results from parallel executors', () => {
+	// Simulate two executors each returning a feature
+	const feature1 = {
+		name: 'Login',
+		status: 'passed',
+		scenarios: [
+			{
+				name: 'Valid login',
+				status: 'passed',
+				steps: [
+					{ text: 'go to /login', keyword: 'Given ', status: 'passed', duration: 10, line: 1, attachments: [], logs: [] },
+					{ text: 'type user', keyword: 'When ', status: 'passed', duration: 5, line: 2, attachments: [], logs: [] },
+				],
+				duration: 15,
+				tags: [],
+				line: 1,
+			},
+		],
+		duration: 15,
+		tags: [],
+	};
+	const feature2 = {
+		name: 'Checkout',
+		status: 'failed',
+		scenarios: [
+			{
+				name: 'Add to cart',
+				status: 'failed',
+				steps: [
+					{ text: 'click buy', keyword: 'When ', status: 'failed', duration: 20, line: 5, attachments: [], logs: [], error: new Error('not found') },
+				],
+				duration: 20,
+				tags: [],
+				line: 5,
+			},
+		],
+		duration: 20,
+		tags: [],
+	};
+
+	// Merge as if two parallel executors returned them
+	const combined = [feature1, feature2];
+	const summary = computeSummary(combined);
+
+	assert.equal(summary.scenarios.total, 2);
+	assert.equal(summary.scenarios.passed, 1);
+	assert.equal(summary.scenarios.failed, 1);
+	assert.equal(summary.steps.total, 3);
+	assert.equal(summary.steps.passed, 2);
+	assert.equal(summary.steps.failed, 1);
+});
+
+test('computeSummary handles empty feature list', () => {
+	const summary = computeSummary([]);
+	assert.equal(summary.scenarios.total, 0);
+	assert.equal(summary.steps.total, 0);
+});
+
+// -----------------------------------------------------------------------
+// BddExecutor — tagFilter integration
+// -----------------------------------------------------------------------
+
+await testAsync('executor with tagFilter skips non-matching scenarios', async () => {
+	const registry = new StepRegistry();
+	registry.register('Given', /^a step$/, async () => {});
+
+	const executor = new BddExecutor({
+		registry,
+		hooks: new HookRegistry(),
+		tagFilter: '@smoke',
+		worldFactory: () => ({ page: null, browser: null, ctx: {}, attach: () => {}, log: () => {} }),
+	});
+
+	const doc = parseGherkin(
+		`Feature: Tag test
+  @smoke
+  Scenario: Runs
+    Given a step
+
+  @slow
+  Scenario: Skipped
+    Given a step
+`,
+		'tag-test.feature',
+	);
+
+	const result = await executor.run([doc]);
+	// Only the @smoke scenario should run
+	assert.equal(result.summary.scenarios.total, 2);
+	assert.equal(result.summary.scenarios.passed, 1);
+	assert.equal(result.summary.scenarios.skipped, 1);
+});
+
+await testAsync('executor without tagFilter runs all scenarios', async () => {
+	const registry = new StepRegistry();
+	registry.register('Given', /^a step$/, async () => {});
+
+	const executor = new BddExecutor({
+		registry,
+		hooks: new HookRegistry(),
+		worldFactory: () => ({ page: null, browser: null, ctx: {}, attach: () => {}, log: () => {} }),
+	});
+
+	const doc = parseGherkin(
+		`Feature: No filter
+  @smoke
+  Scenario: A
+    Given a step
+
+  @slow
+  Scenario: B
+    Given a step
+`,
+		'no-filter.feature',
+	);
+
+	const result = await executor.run([doc]);
+	assert.equal(result.summary.scenarios.total, 2);
+	assert.equal(result.summary.scenarios.passed, 2);
+});
+
+// -----------------------------------------------------------------------
+// BddExecutor — multiple documents (simulates parallel split)
+// -----------------------------------------------------------------------
+
+await testAsync('executor handles split document sets correctly', async () => {
+	const registry = new StepRegistry();
+	registry.register('Given', /^step one$/, async () => {});
+	registry.register('Given', /^step two$/, async () => {});
+
+	const hooks = new HookRegistry();
+	const worldFactory = () => ({ page: null, browser: null, ctx: {}, attach: () => {}, log: () => {} });
+
+	const doc1 = parseGherkin(
+		`Feature: First
+  Scenario: S1
+    Given step one`,
+		'first.feature',
+	);
+	const doc2 = parseGherkin(
+		`Feature: Second
+  Scenario: S2
+    Given step two`,
+		'second.feature',
+	);
+
+	// Simulate two parallel executors each getting a subset
+	const exec1 = new BddExecutor({ registry, hooks, worldFactory });
+	const exec2 = new BddExecutor({ registry, hooks, worldFactory });
+
+	const [r1, r2] = await Promise.all([exec1.run([doc1]), exec2.run([doc2])]);
+
+	// Both should pass independently
+	assert.equal(r1.summary.scenarios.passed, 1);
+	assert.equal(r2.summary.scenarios.passed, 1);
+
+	// Merge results
+	const merged = computeSummary([...r1.features, ...r2.features]);
+	assert.equal(merged.scenarios.total, 2);
+	assert.equal(merged.scenarios.passed, 2);
+});
+
+// -----------------------------------------------------------------------
 // Summary
 // -----------------------------------------------------------------------
 

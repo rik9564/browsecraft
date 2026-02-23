@@ -78,6 +78,10 @@ export interface BddConfig {
 	steps?: string;
 	/** Whether to register the 38 built-in step definitions (default: true) */
 	builtInSteps?: boolean;
+	/** Tag filter expression, e.g. "@smoke and not @wip" */
+	tagFilter?: string;
+	/** Only run scenarios whose name matches this string */
+	grep?: string;
 }
 
 // ---------------------------------------------------------------------------

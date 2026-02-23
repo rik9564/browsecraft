@@ -91,7 +91,7 @@ async function runTests(args: string[]) {
 
 	// BDD mode: run .feature files with step definitions
 	if (flags.bdd) {
-		await runBddTests(config, userConfig);
+		await runBddTests(config, userConfig, flags, filePatterns);
 		return;
 	}
 
@@ -160,24 +160,71 @@ async function runTests(args: string[]) {
 
 // ---------------------------------------------------------------------------
 // BDD Command — runs .feature files with step definitions
+//
+// Supports:
+//   - Single / multiple feature files: browsecraft test --bdd login.feature
+//   - Tag filtering:   --tag "@smoke and not @wip"
+//   - Name filtering:  --grep "login"
+//   - Multi-browser:   --browser chrome,firefox
+//   - Parallel:        --workers 4
+//   - Strategy:        --strategy parallel|sequential|matrix
 // ---------------------------------------------------------------------------
+
+type BddModule = typeof import('browsecraft-bdd');
 
 async function runBddTests(
 	config: ReturnType<typeof resolveConfig>,
 	userConfig?: UserConfig,
+	flags?: CLIFlags,
+	filePatterns?: string[],
 ): Promise<void> {
-	const bddModule = (await import('browsecraft-bdd')) as typeof import('browsecraft-bdd');
-	const { parseGherkin, BddExecutor, registerBuiltInSteps, After } = bddModule;
+	const bddModule = (await import('browsecraft-bdd')) as BddModule;
+	const { parseGherkin, BddExecutor, registerBuiltInSteps, After, computeSummary } = bddModule;
 	const cwd = process.cwd();
 
-	// Resolve BDD config from user config
+	// ── Resolve options from config + CLI flags ────────────────────────
 	const bddConfig = userConfig?.bdd ?? {};
 	const featuresPattern = bddConfig.features ?? 'features/**/*.feature';
 	const stepsPattern = bddConfig.steps ?? 'steps/**/*.{ts,js,mts,mjs}';
-	const useBuiltInSteps = bddConfig.builtInSteps !== false; // default true
+	const useBuiltInSteps = bddConfig.builtInSteps !== false;
 
-	// Step 1: Discover .feature files
-	const featureFiles = discoverFiles(cwd, featuresPattern, ['.feature']);
+	// Browsers: --browser chrome,firefox  or  config.browsers  or  [config.browser]
+	const browserNames: string[] = flags?.browser
+		? flags.browser.split(',').map((b) => b.trim())
+		: config.browsers ?? [config.browser];
+
+	// Workers per browser (for parallel feature execution)
+	const workers = flags?.workers ?? (browserNames.length > 1 ? 1 : 1);
+
+	// Strategy: --strategy  or  config.strategy
+	const strategy = (flags?.strategy ?? config.strategy ?? 'sequential') as
+		| 'parallel'
+		| 'sequential'
+		| 'matrix';
+
+	// Tag filter: --tag  or  bddConfig.tagFilter
+	const tagFilter = flags?.tag ?? bddConfig.tagFilter;
+
+	// Grep: --grep  or  bddConfig.grep
+	const grepPattern = flags?.grep ?? bddConfig.grep;
+
+	// Fail fast: --bail
+	const failFast = flags?.bail ?? false;
+
+	// ── Step 1: Discover .feature files ────────────────────────────────
+	let featureFiles: string[];
+
+	if (filePatterns && filePatterns.length > 0) {
+		// Explicit feature files from CLI positional args
+		featureFiles = filePatterns.map((f) => resolve(cwd, f)).filter((f) => existsSync(f));
+		if (featureFiles.length === 0) {
+			console.error('\n  No matching feature files found.\n');
+			process.exit(1);
+		}
+	} else {
+		featureFiles = discoverFiles(cwd, featuresPattern, ['.feature']);
+	}
+
 	if (featureFiles.length === 0) {
 		console.log('\n  No .feature files found.\n');
 		console.log(`  Feature pattern: ${featuresPattern}`);
@@ -185,12 +232,11 @@ async function runBddTests(
 		process.exit(0);
 	}
 
-	// Step 2: Register built-in steps if enabled
+	// ── Step 2: Register steps ─────────────────────────────────────────
 	if (useBuiltInSteps) {
 		registerBuiltInSteps();
 	}
 
-	// Step 3: Load step definition files
 	const stepFiles = discoverFiles(cwd, stepsPattern, ['.ts', '.js', '.mts', '.mjs']);
 	for (const stepFile of stepFiles) {
 		if (stepFile.endsWith('.ts') || stepFile.endsWith('.mts')) {
@@ -200,7 +246,7 @@ async function runBddTests(
 		await import(fileUrl);
 	}
 
-	// Step 3b: Register an After hook to clean up browser contexts per scenario
+	// Cleanup hook for browser contexts
 	After(async ({ world }) => {
 		const w = world as any;
 		if (w?._context) {
@@ -208,82 +254,205 @@ async function runBddTests(
 		}
 	});
 
-	// Step 4: Parse .feature files into GherkinDocuments
+	// ── Step 3: Parse .feature files ───────────────────────────────────
 	const documents = featureFiles.map((file) => {
 		const source = readFileSync(file, 'utf-8');
 		return parseGherkin(source, relative(cwd, file));
 	});
 
-	// Step 5: Launch browser
-	let browser: Browser;
-	try {
-		browser = await Browser.launch({
-			browser: config.browser,
+	// ── Step 4: Determine execution plan ───────────────────────────────
+	const isMultiBrowser = browserNames.length > 1;
+	const isParallel = workers > 1;
+
+	// Header
+	const parts: string[] = [
+		`${featureFiles.length} feature file${featureFiles.length > 1 ? 's' : ''}`,
+	];
+	if (isMultiBrowser) parts.push(`on ${browserNames.join(', ')}`);
+	if (isParallel) parts.push(`(${workers} workers)`);
+	if (tagFilter) parts.push(`[tags: ${tagFilter}]`);
+	if (grepPattern) parts.push(`[grep: ${grepPattern}]`);
+
+	console.log(`\n  Browsecraft BDD - Running ${parts.join(' ')}\n`);
+
+	if (isMultiBrowser) {
+		console.log(`  Strategy: ${strategy}`);
+		console.log(
+			`  Browsers: ${browserNames.map((b) => b.charAt(0).toUpperCase() + b.slice(1)).join(', ')}`,
+		);
+		console.log('');
+	}
+
+	// ── Step 5: Execute ────────────────────────────────────────────────
+	type FeatureResultType = Awaited<ReturnType<InstanceType<typeof BddExecutor>['run']>>['features'][number];
+
+	/**
+	 * Run a set of documents on a specific browser.
+	 * Returns the feature results and the launched browser instance.
+	 */
+	const runOnBrowser = async (
+		browserName: string,
+		docs: ReturnType<typeof parseGherkin>[],
+		prefix: string,
+	): Promise<{ features: FeatureResultType[]; duration: number; browser: Browser }> => {
+		const browser = await Browser.launch({
+			browser: browserName as any,
 			headless: config.headless,
 			executablePath: config.executablePath,
 			debug: config.debug,
 			timeout: config.timeout,
 		});
-	} catch (err) {
-		console.error(`Failed to launch browser: ${err instanceof Error ? err.message : String(err)}`);
-		process.exit(1);
-	}
 
-	// Step 6: Create executor with a worldFactory that provides page + browser
-	const executor = new BddExecutor({
-		stepTimeout: config.timeout,
-		worldFactory: async () => {
-			const context = await browser.newContext();
-			const page = await context.newPage();
-			return {
-				page,
-				browser,
-				ctx: {},
-				attach: () => {},
-				log: (msg: string) => console.log(`      ${msg}`),
-				// Store context for cleanup
-				_context: context,
-			};
-		},
-		onFeatureStart: (feature) => {
-			console.log(`\n  Feature: ${feature.name}`);
-		},
-		onScenarioStart: (scenario) => {
-			console.log(`    Scenario: ${scenario.name}`);
-		},
-		onStepEnd: (result) => {
-			const icon =
-				result.status === 'passed'
-					? '\x1b[32m+\x1b[0m'
-					: result.status === 'failed'
-						? '\x1b[31mx\x1b[0m'
-						: result.status === 'undefined'
-							? '\x1b[33m?\x1b[0m'
-							: result.status === 'pending'
-								? '\x1b[33m-\x1b[0m'
-								: '\x1b[90m-\x1b[0m';
-			console.log(`      ${icon} ${result.keyword.trim()} ${result.text} (${result.duration}ms)`);
-			if (result.status === 'failed' && result.error) {
-				console.log(`        ${result.error.message}`);
-			}
-			if (result.status === 'undefined') {
-				console.log('        Step not defined. Add it to your step definitions.');
-			}
-		},
-		onScenarioEnd: () => {},
-	});
+		const createExecutor = (docSubset: ReturnType<typeof parseGherkin>[]) =>
+			new BddExecutor({
+				stepTimeout: config.timeout,
+				tagFilter: tagFilter ?? undefined,
+				failFast,
+				worldFactory: async () => {
+					const context = await browser.newContext();
+					const page = await context.newPage();
+					return {
+						page,
+						browser,
+						ctx: {},
+						attach: () => {},
+						log: (msg: string) => console.log(`      ${prefix}${msg}`),
+						_context: context,
+					};
+				},
+				onFeatureStart: (feature) => {
+					console.log(`\n  ${prefix}Feature: ${feature.name}`);
+				},
+				onScenarioStart: (scenario) => {
+					// Grep filter — skip scenarios that don't match
+					if (grepPattern && !scenario.name.includes(grepPattern)) return;
+					console.log(`    ${prefix}Scenario: ${scenario.name}`);
+				},
+				onStepEnd: (result) => {
+					const icon =
+						result.status === 'passed'
+							? '\x1b[32m+\x1b[0m'
+							: result.status === 'failed'
+								? '\x1b[31mx\x1b[0m'
+								: result.status === 'undefined'
+									? '\x1b[33m?\x1b[0m'
+									: result.status === 'pending'
+										? '\x1b[33m-\x1b[0m'
+										: '\x1b[90m-\x1b[0m';
+					console.log(
+						`      ${prefix}${icon} ${result.keyword.trim()} ${result.text} (${result.duration}ms)`,
+					);
+					if (result.status === 'failed' && result.error) {
+						console.log(`        ${prefix}${result.error.message}`);
+					}
+					if (result.status === 'undefined') {
+						console.log(`        ${prefix}Step not defined. Add it to your step definitions.`);
+					}
+				},
+				onScenarioEnd: () => {},
+			});
 
-	// Step 7: Run features
-	console.log(
-		`\n  Browsecraft BDD - Running ${featureFiles.length} feature file${featureFiles.length > 1 ? 's' : ''}\n`,
-	);
+		let allFeatures: FeatureResultType[] = [];
+		const start = Date.now();
+
+		if (workers > 1 && docs.length > 1) {
+			// Parallel: split documents into worker chunks
+			const chunks = splitIntoChunks(docs, workers);
+			const results = await Promise.all(
+				chunks.map((chunk) => {
+					const exec = createExecutor(chunk);
+					return exec.run(chunk);
+				}),
+			);
+			allFeatures = results.flatMap((r) => r.features);
+		} else {
+			// Sequential: single executor
+			const exec = createExecutor(docs);
+			const result = await exec.run(docs);
+			allFeatures = result.features;
+		}
+
+		return { features: allFeatures, duration: Date.now() - start, browser };
+	};
+
+	// ── Execute according to strategy ──────────────────────────────────
+	const browsers: Browser[] = [];
+	let allFeatures: FeatureResultType[] = [];
+	let totalDuration = 0;
+	const perBrowserResults: Array<{
+		browserName: string;
+		features: FeatureResultType[];
+		duration: number;
+	}> = [];
 
 	try {
-		const result = await executor.run(documents);
+		if (!isMultiBrowser) {
+			// Single browser — simple path
+			const { features, duration, browser } = await runOnBrowser(browserNames[0]!, documents, '');
+			browsers.push(browser);
+			allFeatures = features;
+			totalDuration = duration;
+			perBrowserResults.push({ browserName: browserNames[0]!, features, duration });
+		} else if (strategy === 'sequential') {
+			// Sequential: one browser at a time, each runs all features
+			for (const bName of browserNames) {
+				const prefix = `\x1b[36m[${bName}]\x1b[0m `;
+				const { features, duration, browser } = await runOnBrowser(
+					bName,
+					documents,
+					prefix,
+				);
+				browsers.push(browser);
+				allFeatures.push(...features);
+				totalDuration += duration;
+				perBrowserResults.push({ browserName: bName, features, duration });
+			}
+		} else {
+			// Parallel or Matrix: all browsers simultaneously
+			// (matrix = every feature on every browser; parallel = same as matrix for distinct browsers)
+			const results = await Promise.all(
+				browserNames.map((bName) => {
+					const prefix = `\x1b[36m[${bName}]\x1b[0m `;
+					return runOnBrowser(bName, documents, prefix);
+				}),
+			);
+			for (let i = 0; i < results.length; i++) {
+				const r = results[i]!;
+				browsers.push(r.browser);
+				allFeatures.push(...r.features);
+				perBrowserResults.push({
+					browserName: browserNames[i]!,
+					features: r.features,
+					duration: r.duration,
+				});
+			}
+			totalDuration = Math.max(...results.map((r) => r.duration));
+		}
 
-		// Print summary
+		// ── Print summary ──────────────────────────────────────────────
+		const summary = computeSummary(allFeatures);
 		console.log('\n  ─────────────────────────────────────');
-		const { scenarios, steps } = result.summary;
+
+		// Per-browser breakdown for multi-browser runs
+		if (isMultiBrowser) {
+			for (const br of perBrowserResults) {
+				const brSummary = computeSummary(br.features);
+				const brLabel = br.browserName.charAt(0).toUpperCase() + br.browserName.slice(1);
+				const brParts: string[] = [];
+				if (brSummary.scenarios.passed > 0)
+					brParts.push(`\x1b[32m${brSummary.scenarios.passed} passed\x1b[0m`);
+				if (brSummary.scenarios.failed > 0)
+					brParts.push(`\x1b[31m${brSummary.scenarios.failed} failed\x1b[0m`);
+				if (brSummary.scenarios.skipped > 0)
+					brParts.push(`\x1b[33m${brSummary.scenarios.skipped} skipped\x1b[0m`);
+				console.log(
+					`  ${brLabel.padEnd(10)} ${brParts.join(', ')} (${brSummary.scenarios.total} scenarios)  ${br.duration < 1000 ? `${br.duration}ms` : `${(br.duration / 1000).toFixed(1)}s`}`,
+				);
+			}
+			console.log('  ─────────────────────────────────────');
+		}
+
+		const { scenarios, steps } = summary;
 
 		const scenarioParts: string[] = [];
 		if (scenarios.passed > 0) scenarioParts.push(`\x1b[32m${scenarios.passed} passed\x1b[0m`);
@@ -300,8 +469,11 @@ async function runBddTests(
 		console.log(`  Scenarios: ${scenarioParts.join(', ')} (${scenarios.total} total)`);
 		console.log(`  Steps:     ${stepParts.join(', ')} (${steps.total} total)`);
 		console.log(
-			`  Time:      ${result.duration < 1000 ? `${result.duration}ms` : `${(result.duration / 1000).toFixed(1)}s`}`,
+			`  Time:      ${totalDuration < 1000 ? `${totalDuration}ms` : `${(totalDuration / 1000).toFixed(1)}s`}`,
 		);
+		if (isMultiBrowser) {
+			console.log(`  Strategy:  ${strategy}`);
+		}
 		console.log('');
 
 		if (scenarios.failed > 0) {
@@ -312,13 +484,32 @@ async function runBddTests(
 			console.log('  \x1b[32mAll scenarios passed!\x1b[0m\n');
 		}
 
-		await browser.close().catch(() => {});
+		// Clean up all browsers
+		for (const b of browsers) {
+			await b.close().catch(() => {});
+		}
+
 		process.exit(scenarios.failed > 0 || steps.undefined > 0 ? 1 : 0);
 	} catch (err) {
-		await browser.close().catch(() => {});
+		for (const b of browsers) {
+			await b.close().catch(() => {});
+		}
 		console.error(`BDD execution error: ${err instanceof Error ? err.message : String(err)}`);
 		process.exit(1);
 	}
+}
+
+/**
+ * Split an array into N roughly-equal chunks.
+ * Used for distributing feature files across parallel workers.
+ */
+function splitIntoChunks<T>(items: T[], n: number): T[][] {
+	const chunks: T[][] = [];
+	const size = Math.ceil(items.length / n);
+	for (let i = 0; i < items.length; i += size) {
+		chunks.push(items.slice(i, i + size));
+	}
+	return chunks;
 }
 
 /**
@@ -720,6 +911,10 @@ interface CLIFlags {
 	bail?: boolean;
 	debug?: boolean;
 	bdd?: boolean;
+	/** BDD tag filter expression, e.g. "@smoke and not @wip" */
+	tag?: string;
+	/** Execution strategy: parallel, sequential, or matrix */
+	strategy?: string;
 }
 
 function parseFlags(args: string[]): CLIFlags {
@@ -759,6 +954,13 @@ function parseFlags(args: string[]): CLIFlags {
 			case '-g':
 				flags.grep = args[++i];
 				break;
+			case '--tag':
+			case '--tags':
+				flags.tag = args[++i];
+				break;
+			case '--strategy':
+				flags.strategy = args[++i];
+				break;
 		}
 	}
 
@@ -775,7 +977,7 @@ function printHelp() {
 
   Usage:
     browsecraft test [files...] [options]
-    browsecraft test --bdd [options]
+    browsecraft test --bdd [features...] [options]
     browsecraft init
     browsecraft setup-ide
 
@@ -787,26 +989,36 @@ function printHelp() {
 
   Options:
     --bdd               Run BDD feature files instead of programmatic tests
-    --browser <name>    Browser to use: chrome, firefox, edge (default: chrome)
+    --browser <names>   Browser(s) to use: chrome,firefox,edge (comma-separated)
     --headed            Run in headed mode (show the browser)
     --headless          Run in headless mode (default)
-    --workers <n>       Number of parallel workers (default: half CPU cores)
+    --workers <n>       Parallel workers — features run concurrently (default: 1)
     --timeout <ms>      Global timeout in milliseconds (default: 30000)
     --retries <n>       Retry failed tests n times (default: 0)
-    --grep <pattern>    Only run tests matching pattern
+    --grep <pattern>    Only run tests/scenarios matching pattern
+    --tag <expr>        BDD tag filter: "@smoke", "@smoke and not @wip"
+    --strategy <s>      Multi-browser strategy: parallel, sequential, matrix
     --bail              Stop after first failure
     --debug             Enable verbose debug logging
     -h, --help          Show this help message
     -v, --version       Show version
 
-  Examples:
+  BDD Examples:
+    browsecraft test --bdd                                  # All features, 1 browser
+    browsecraft test --bdd features/login.feature           # Single feature
+    browsecraft test --bdd --tag "@smoke"                   # Tag filter
+    browsecraft test --bdd --grep "checkout"                # Name filter
+    browsecraft test --bdd --workers 4                      # 4 features in parallel
+    browsecraft test --bdd --browser chrome,firefox         # Multi-browser
+    browsecraft test --bdd --browser chrome,firefox,edge --strategy matrix
+    browsecraft test --bdd --headed --browser firefox       # Headed mode
+
+  Programmatic Examples:
     browsecraft test                          # Run all tests
     browsecraft test tests/login.test.ts      # Run specific file
     browsecraft test --headed --browser firefox
     browsecraft test --grep "login" --bail
-    browsecraft test --bdd                       # Run all .feature files
-    browsecraft test --bdd --headed              # Run BDD in headed mode
-    browsecraft setup-ide                        # Auto-configure IDE for BDD
+    browsecraft setup-ide                     # Auto-configure IDE for BDD
 `);
 }
 

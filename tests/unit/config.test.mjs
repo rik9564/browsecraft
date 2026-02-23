@@ -307,6 +307,46 @@ test('resolveAIConfig "auto" OpenAI takes priority over GitHub Models', () => {
 });
 
 // -----------------------------------------------------------------------
+// BddConfig — tagFilter and grep fields
+// -----------------------------------------------------------------------
+
+test('BddConfig tagFilter is preserved in config', () => {
+	const cfg = resolveConfig({
+		bdd: { tagFilter: '@smoke and not @wip', grep: 'login' },
+	});
+	assert.equal(cfg.bdd.tagFilter, '@smoke and not @wip');
+	assert.equal(cfg.bdd.grep, 'login');
+});
+
+test('BddConfig defaults are optional', () => {
+	const cfg = resolveConfig({ bdd: {} });
+	assert.equal(cfg.bdd.tagFilter, undefined);
+	assert.equal(cfg.bdd.grep, undefined);
+	assert.equal(cfg.bdd.builtInSteps, undefined);
+});
+
+test('browsers config supports array of browser names', () => {
+	const cfg = resolveConfig({ browsers: ['chrome', 'firefox', 'edge'] });
+	assert.deepEqual(cfg.browsers, ['chrome', 'firefox', 'edge']);
+	assert.equal(cfg.browser, 'chrome'); // default still set
+});
+
+test('strategy defaults to matrix', () => {
+	const cfg = resolveConfig();
+	assert.equal(cfg.strategy, 'matrix');
+});
+
+test('strategy can be overridden', () => {
+	const cfg = resolveConfig({ strategy: 'sequential' });
+	assert.equal(cfg.strategy, 'sequential');
+});
+
+test('workers defaults to at least 1', () => {
+	const cfg = resolveConfig();
+	assert.ok(cfg.workers >= 1);
+});
+
+// -----------------------------------------------------------------------
 // Summary
 // -----------------------------------------------------------------------
 
