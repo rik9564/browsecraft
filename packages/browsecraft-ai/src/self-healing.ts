@@ -433,9 +433,18 @@ function setOverlap(a: string[], b: string[]): number {
 	const setA = new Set(a);
 	const setB = new Set(b);
 	let intersection = 0;
-	for (const item of setA) {
-		if (setB.has(item)) intersection++;
+
+	// Iterate over the smaller set to minimize work
+	if (setA.size < setB.size) {
+		for (const item of setA) {
+			if (setB.has(item)) intersection++;
+		}
+	} else {
+		for (const item of setB) {
+			if (setA.has(item)) intersection++;
+		}
 	}
-	const union = new Set([...a, ...b]).size;
-	return union > 0 ? intersection / union : 0;
+
+	const unionSize = setA.size + setB.size - intersection;
+	return unionSize > 0 ? intersection / unionSize : 0;
 }
