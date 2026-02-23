@@ -400,7 +400,16 @@ async function runBddTests(
 						console.log(`        ${prefix}Step not defined. Add it to your step definitions.`);
 					}
 				},
-				onScenarioEnd: () => {},
+				onScenarioEnd: (result) => {
+					// Print hookError when worldFactory or hooks fail (0 steps executed)
+					if (result.hookError) {
+						console.log(`      ${prefix}\x1b[31m✗ ${result.hookError.message}\x1b[0m`);
+					}
+					// Show scenario-level failure summary when steps ran but some failed
+					if (result.status === 'failed' && !result.hookError && result.steps.length === 0) {
+						console.log(`      ${prefix}\x1b[31m✗ Scenario failed with no steps executed\x1b[0m`);
+					}
+				},
 			});
 
 		let allFeatures: FeatureResultType[] = [];
@@ -524,7 +533,26 @@ async function runBddTests(
 		console.log('');
 
 		if (scenarios.failed > 0) {
-			console.log('  \x1b[31mSome scenarios failed.\x1b[0m\n');
+			// List failed scenarios with error details
+			console.log('  \x1b[31mFailed scenarios:\x1b[0m');
+			for (const feat of allFeatures) {
+				for (const scen of feat.scenarios) {
+					if (scen.status !== 'failed') continue;
+					console.log(`    \x1b[31m✗\x1b[0m ${feat.name} → ${scen.name}`);
+					if (scen.hookError) {
+						console.log(`      Error: ${scen.hookError.message}`);
+					}
+					for (const st of scen.steps) {
+						if (st.status === 'failed' && st.error) {
+							console.log(`      ${st.keyword.trim()} ${st.text}: ${st.error.message}`);
+						}
+						if (st.status === 'undefined') {
+							console.log(`      ${st.keyword.trim()} ${st.text}: \x1b[33mStep not defined\x1b[0m`);
+						}
+					}
+				}
+			}
+			console.log('');
 		} else if (steps.undefined > 0) {
 			console.log('  \x1b[33mSome steps are undefined.\x1b[0m\n');
 		} else {
