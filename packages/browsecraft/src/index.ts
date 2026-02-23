@@ -44,6 +44,10 @@ export type {
 	InterceptedRequest,
 } from './page.js';
 
+// Wait utilities
+export { waitFor, sleep } from './wait.js';
+export type { WaitOptions } from './wait.js';
+
 // Errors — rich diagnostics
 export {
 	BrowsecraftError,

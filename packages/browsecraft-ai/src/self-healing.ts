@@ -95,7 +95,7 @@ export async function healSelector(
 	const { context, useAI = true, token, minConfidence = 0.3 } = options;
 
 	// 1. Try non-AI heuristics first (fast, always available)
-	const heuristicResult = heuristicHeal(failedSelector, snapshot, context);
+	const heuristicResult = heuristicHeal(failedSelector, snapshot, context, minConfidence);
 
 	// If we got a high-confidence heuristic match, return immediately
 	if (heuristicResult.healed && heuristicResult.confidence >= 0.8) {
@@ -140,6 +140,7 @@ function heuristicHeal(
 	failedSelector: string,
 	snapshot: PageSnapshot,
 	context?: string,
+	minConfidence = 0.3,
 ): HealResult {
 	const candidates: HealResult['candidates'] = [];
 	const parsed = parseSelector(failedSelector);
@@ -151,7 +152,7 @@ function heuristicHeal(
 		// ID similarity
 		if (parsed.id && el.id) {
 			const sim = stringSimilarity(parsed.id, el.id);
-			if (sim > 0.5) {
+			if (sim >= 0.5) {
 				score += sim * 0.4;
 				reasons.push(`ID similar: "${el.id}" (${(sim * 100).toFixed(0)}%)`);
 			}
@@ -175,7 +176,7 @@ function heuristicHeal(
 		// Text similarity (for text-based selectors)
 		if (parsed.text && el.text) {
 			const sim = stringSimilarity(parsed.text.toLowerCase(), el.text.toLowerCase());
-			if (sim > 0.4) {
+			if (sim >= 0.4) {
 				score += sim * 0.35;
 				reasons.push(`Text similar: "${el.text.slice(0, 50)}" (${(sim * 100).toFixed(0)}%)`);
 			}
@@ -190,7 +191,7 @@ function heuristicHeal(
 				.toLowerCase();
 
 			const sim = stringSimilarity(contextLower, combined);
-			if (sim > 0.3) {
+			if (sim >= 0.3) {
 				score += sim * 0.25;
 				reasons.push(`Context match: "${context}" (${(sim * 100).toFixed(0)}%)`);
 			}
@@ -199,7 +200,7 @@ function heuristicHeal(
 		// Attribute matches (data-testid, name, placeholder)
 		if (parsed.testId && el.testId) {
 			const sim = stringSimilarity(parsed.testId, el.testId);
-			if (sim > 0.5) {
+			if (sim >= 0.5) {
 				score += sim * 0.3;
 				reasons.push(`TestId similar: "${el.testId}"`);
 			}
@@ -207,7 +208,7 @@ function heuristicHeal(
 
 		if (parsed.name && el.name) {
 			const sim = stringSimilarity(parsed.name, el.name);
-			if (sim > 0.5) {
+			if (sim >= 0.5) {
 				score += sim * 0.2;
 				reasons.push(`Name similar: "${el.name}"`);
 			}
@@ -216,7 +217,7 @@ function heuristicHeal(
 		// Normalize score to 0-1
 		const confidence = Math.min(score, 1);
 
-		if (confidence > 0.15) {
+		if (confidence > Math.min(minConfidence * 0.5, 0.15)) {
 			candidates.push({
 				selector: el.selector,
 				confidence,
@@ -229,7 +230,7 @@ function heuristicHeal(
 	candidates.sort((a, b) => b.confidence - a.confidence);
 
 	const best = candidates[0];
-	if (best && best.confidence >= 0.3) {
+	if (best && best.confidence >= minConfidence) {
 		return {
 			healed: true,
 			selector: best.selector,

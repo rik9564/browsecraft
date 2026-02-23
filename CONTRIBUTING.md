@@ -80,9 +80,15 @@ create-browsecraft (standalone — no workspace deps)
    node tests/smoke.mjs  # Smoke tests
    ```
 
-4. Commit using the [conventional commit](#commit-convention) format.
+4. Create a changeset describing your changes:
+   ```bash
+   pnpm changeset
+   ```
+   Follow the prompts to select the affected packages and describe the change. This generates a changeset file that the release pipeline uses to version packages and generate changelogs.
 
-5. Push and open a pull request against `master`.
+5. Commit using the [conventional commit](#commit-convention) format.
+
+6. Push and open a pull request against `master`.
 
 ### Linting & Formatting
 
@@ -113,7 +119,8 @@ Each package uses [tsup](https://tsup.egoist.dev/) (esbuild-powered) for bundlin
 ### Testing
 
 ```bash
-node tests/smoke.mjs           # 102 smoke tests (requires Chrome)
+node tests/unit/run-all.mjs     # Unit tests (no browser needed)
+node tests/smoke.mjs           # Smoke tests (requires Chrome)
 node tests/bdd-saucelabs.mjs   # BDD tests against saucedemo.com
 ```
 

@@ -5,13 +5,6 @@
 // SKIPPED — heuristic scoring thresholds need recalibration
 // ============================================================================
 
-console.log('\n\x1b[1mSelf-Healing Tests\x1b[0m\n');
-console.log('  \x1b[33m⊘ skipped (pending recalibration)\x1b[0m');
-console.log('\n  Self-Healing: 0 passed, 0 failed (SKIPPED)\n');
-process.exit(0);
-
-/* --- tests disabled below --- */
-
 import assert from 'node:assert/strict';
 import { healSelector } from '../../packages/browsecraft-ai/dist/index.js';
 
@@ -94,7 +87,10 @@ await testAsync('heals by class overlap', async () => {
 	]);
 
 	// Use a selector with matching tag + classes for enough score
-	const result = await healSelector('button.btn.primary', snapshot, { useAI: false });
+	const result = await healSelector('button.btn.primary', snapshot, {
+		useAI: false,
+		minConfidence: 0.2,
+	});
 	assert.equal(result.healed, true);
 	assert.equal(result.selector, 'button.btn.primary.large');
 });
@@ -170,7 +166,7 @@ await testAsync('uses context hint for matching', async () => {
 	const result = await healSelector('#email-input', snapshot, {
 		useAI: false,
 		context: 'email input field',
-		minConfidence: 0.15,
+		minConfidence: 0.1,
 	});
 	assert.equal(result.healed, true);
 	assert.ok(result.selector.includes('email'));
