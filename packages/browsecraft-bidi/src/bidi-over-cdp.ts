@@ -56,6 +56,7 @@ export async function connectBidiOverCdp(
 
 	// 3. Deep import the concrete MapperCdpConnection class
 	//    (BidiMapper only exports it as a type, not the class itself)
+	// biome-ignore lint/suspicious/noExplicitAny: dynamic import of untyped chromium-bidi internals
 	const cdpConnectionModule = (await import('chromium-bidi/lib/cjs/cdp/CdpConnection.js')) as any;
 	const MapperCdpConnection = cdpConnectionModule.MapperCdpConnection;
 
@@ -117,8 +118,8 @@ export async function connectBidiOverCdp(
 	};
 
 	// 8. Create and start the BidiServer mapper
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic import types
 	const bidiServer = await BidiServer.createAndStart(
+		// biome-ignore lint/suspicious/noExplicitAny: chromium-bidi BidiServer.createAndStart has no public transport type
 		bidiTransport as any,
 		cdpConnection,
 		browserCdpClient,

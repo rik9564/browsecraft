@@ -12,6 +12,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { BrowserName } from 'browsecraft-bidi';
 import { type RunnableTest, type RunnerOptions, TestRunner } from 'browsecraft-runner';
 import { Browser } from './browser.js';
 import { type UserConfig, resolveConfig } from './config.js';
@@ -74,7 +75,7 @@ async function runTests(args: string[]) {
 		config.headless = false;
 	}
 	if (flags.browser) {
-		config.browser = flags.browser as any;
+		config.browser = flags.browser as BrowserName;
 	}
 	if (flags.workers !== undefined) {
 		config.workers = flags.workers;
@@ -268,7 +269,7 @@ async function runBddTests(
 
 	// Cleanup hook for browser contexts
 	After(async ({ world }) => {
-		const w = world as any;
+		const w = world as unknown as Record<string, { close(): Promise<unknown> } | undefined>;
 		if (w?._context) {
 			await w._context.close().catch(() => {});
 		}
@@ -338,7 +339,7 @@ async function runBddTests(
 		prefix: string,
 	): Promise<{ features: FeatureResultType[]; duration: number; browser: Browser }> => {
 		const browser = await Browser.launch({
-			browser: browserName as any,
+			browser: browserName as BrowserName,
 			headless: config.headless,
 			executablePath: config.executablePath,
 			debug: config.debug,

@@ -21,15 +21,50 @@ import { type StepFunction, type StepRegistry, globalRegistry } from './step-reg
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Duck-typed interface for the Page object methods used by built-in steps.
+ * Since browsecraft-bdd doesn't depend on the core browsecraft package, we
+ * define a minimal interface instead of importing Page directly.
+ */
+interface BddPage {
+	goto(url: string): Promise<unknown>;
+	reload(): Promise<unknown>;
+	goBack(): Promise<unknown>;
+	goForward(): Promise<unknown>;
+	click(target: string): Promise<void>;
+	dblclick(target: string): Promise<void>;
+	hover(target: string): Promise<void>;
+	tap(target: string): Promise<void>;
+	focus(target: string): Promise<void>;
+	fill(target: string, value: string): Promise<void>;
+	type(target: string, text: string): Promise<void>;
+	select(target: string, value: string): Promise<void>;
+	check(target: string): Promise<void>;
+	uncheck(target: string): Promise<void>;
+	press(key: string): Promise<void>;
+	see(text: string): Promise<void>;
+	waitForSelector(target: string, options?: { state?: string; timeout?: number }): Promise<unknown>;
+	url(): Promise<string>;
+	title(): Promise<string>;
+	innerText(target: string): Promise<string>;
+	inputValue(target: string): Promise<string>;
+	screenshot(): Promise<Buffer>;
+	acceptDialog(): Promise<void>;
+	dismissDialog(): Promise<void>;
+	clearCookies(): Promise<void>;
+	dragTo(source: string, dest: string): Promise<void>;
+	evaluate(script: string): Promise<unknown>;
+}
+
 /** Get the page from the world, throwing if not available */
-function getPage(world: { page: unknown }): any {
+function getPage(world: { page: unknown }): BddPage {
 	if (!world.page) {
 		throw new Error(
 			'Built-in steps require world.page to be set. ' +
 				'Pass a worldFactory to your BddExecutor that provides a Page instance.',
 		);
 	}
-	return world.page;
+	return world.page as BddPage;
 }
 
 // ---------------------------------------------------------------------------

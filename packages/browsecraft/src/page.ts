@@ -9,8 +9,10 @@
 
 import type {
 	BiDiSession,
+	BrowsingContextCaptureScreenshotParams,
 	NetworkSetCookieHeader,
 	NodeRemoteValue,
+	PointerAction,
 	ScriptEvaluateResult,
 	SharedReference,
 	StorageCookie,
@@ -826,7 +828,7 @@ export class Page {
 						{ type: 'pointerMove', x: pos.x, y: pos.y, origin: 'viewport' },
 						{ type: 'pointerDown', button: 0 },
 						{ type: 'pointerUp', button: 0 },
-					] as any,
+					] satisfies PointerAction[],
 				},
 			],
 		});
@@ -1020,7 +1022,7 @@ export class Page {
 						{ type: 'pointerDown', button: 0 },
 						{ type: 'pointerMove', x: destPos.x, y: destPos.y, origin: 'viewport', duration: 300 },
 						{ type: 'pointerUp', button: 0 },
-					] as any,
+					] satisfies PointerAction[],
 				},
 			],
 		});
@@ -2107,7 +2109,7 @@ export class ElementHandle {
 				width: box.width,
 				height: box.height,
 			},
-		} as any);
+		} satisfies BrowsingContextCaptureScreenshotParams);
 
 		return Buffer.from(result.data, 'base64');
 	}
