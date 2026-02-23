@@ -139,3 +139,17 @@ export {
 	type AutoStepOptions,
 	type GeneratedStepDef,
 } from './ai-steps.js';
+
+// ---------------------------------------------------------------------------
+// AI Runtime Step Executor (Mode 4: Zero-maintenance AI execution)
+// ---------------------------------------------------------------------------
+export {
+	AIStepExecutor,
+	createAIStepExecutor,
+	createAIStepExecutorFromConfig,
+	type AIStepExecutorConfig,
+	type AIStepResult,
+	type ActionPlan,
+	type PageAction,
+	type SimpleAIConfig,
+} from './ai-step-executor.js';

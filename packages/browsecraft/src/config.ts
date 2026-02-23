@@ -80,13 +80,72 @@ export interface BddConfig {
 	builtInSteps?: boolean;
 }
 
-export interface AIConfig {
+// ---------------------------------------------------------------------------
+// AI Provider Configs — each provider has its own shape
+// ---------------------------------------------------------------------------
+
+/** GitHub Models — free with any GitHub PAT. Default and recommended. */
+export interface GitHubModelsConfig {
 	provider: 'github-models';
-	/** Model to use (default: 'openai/gpt-4o-mini') */
+	/** Model to use (default: 'openai/gpt-4.1'). See https://github.com/marketplace/models */
 	model?: string;
-	/** Explicit GitHub token (overrides env vars) */
+	/** Explicit GitHub token. Falls back to GITHUB_TOKEN or BROWSECRAFT_GITHUB_TOKEN env var. */
 	token?: string;
 }
+
+/** OpenAI direct API */
+export interface OpenAIConfig {
+	provider: 'openai';
+	/** Model to use (default: 'gpt-4o-mini') */
+	model?: string;
+	/** API key. Falls back to OPENAI_API_KEY env var. */
+	apiKey?: string;
+	/** Custom base URL (for Azure OpenAI or proxies). Falls back to OPENAI_BASE_URL env var. */
+	baseUrl?: string;
+}
+
+/** Anthropic Claude API */
+export interface AnthropicConfig {
+	provider: 'anthropic';
+	/** Model to use (default: 'claude-sonnet-4-20250514') */
+	model?: string;
+	/** API key. Falls back to ANTHROPIC_API_KEY env var. */
+	apiKey?: string;
+}
+
+/** Local Ollama server */
+export interface OllamaConfig {
+	provider: 'ollama';
+	/** Model to use (default: 'llama3.2') */
+	model?: string;
+	/** Ollama server URL. Falls back to OLLAMA_HOST env var. Default: http://localhost:11434 */
+	baseUrl?: string;
+}
+
+/**
+ * AI configuration — controls which AI provider powers step execution.
+ *
+ * ```ts
+ * // GitHub Models (free, default)
+ * ai: { provider: 'github-models' }
+ *
+ * // OpenAI
+ * ai: { provider: 'openai', apiKey: process.env.OPENAI_API_KEY }
+ *
+ * // Anthropic
+ * ai: { provider: 'anthropic' }
+ *
+ * // Local Ollama
+ * ai: { provider: 'ollama', model: 'llama3.2' }
+ *
+ * // Auto-detect from env vars (default behavior)
+ * ai: 'auto'
+ *
+ * // Disable AI entirely
+ * ai: 'off'
+ * ```
+ */
+export type AIConfig = GitHubModelsConfig | OpenAIConfig | AnthropicConfig | OllamaConfig;
 
 /** Users provide a partial config -- everything has smart defaults */
 export type UserConfig = Partial<BrowsecraftConfig>;
@@ -139,4 +198,80 @@ export function resolveConfig(userConfig?: UserConfig): BrowsecraftConfig {
 		...userConfig,
 		viewport: userConfig.viewport ?? DEFAULTS.viewport,
 	};
+}
+
+// ---------------------------------------------------------------------------
+// AI Config Resolution — auto-detect provider from env vars
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the AI configuration from the user's `ai` setting.
+ *
+ * When `ai: 'auto'` (the default), this function checks env vars to
+ * auto-detect which AI provider to use, in priority order:
+ *
+ * 1. `BROWSECRAFT_AI_PROVIDER` — explicit provider override
+ * 2. `OPENAI_API_KEY`          → OpenAI
+ * 3. `ANTHROPIC_API_KEY`       → Anthropic
+ * 4. `GITHUB_TOKEN` or `BROWSECRAFT_GITHUB_TOKEN` → GitHub Models (free)
+ * 5. `OLLAMA_HOST`             → Ollama (local)
+ *
+ * @returns The resolved AIConfig, or null if AI is disabled / no provider found
+ *
+ * ```ts
+ * const config = resolveConfig(userConfig);
+ * const aiConfig = resolveAIConfig(config.ai);
+ *
+ * if (aiConfig) {
+ *   console.log(`AI enabled: ${aiConfig.provider}`);
+ * }
+ * ```
+ */
+export function resolveAIConfig(ai: BrowsecraftConfig['ai']): AIConfig | null {
+	if (ai === 'off') return null;
+
+	// Explicit provider config — use as-is
+	if (typeof ai === 'object') return ai;
+
+	// ai === 'auto' — detect from env vars
+	const explicitProvider = process.env.BROWSECRAFT_AI_PROVIDER;
+
+	if (explicitProvider) {
+		switch (explicitProvider.toLowerCase()) {
+			case 'github-models':
+			case 'github':
+				return { provider: 'github-models' };
+			case 'openai':
+				return { provider: 'openai' };
+			case 'anthropic':
+				return { provider: 'anthropic' };
+			case 'ollama':
+				return { provider: 'ollama' };
+			default:
+				console.warn(
+					`[browsecraft] Unknown AI provider "${explicitProvider}". Supported: github-models, openai, anthropic, ollama`,
+				);
+				return null;
+		}
+	}
+
+	// Auto-detect from API key env vars (priority order)
+	if (process.env.OPENAI_API_KEY) {
+		return { provider: 'openai' };
+	}
+
+	if (process.env.ANTHROPIC_API_KEY) {
+		return { provider: 'anthropic' };
+	}
+
+	if (process.env.BROWSECRAFT_GITHUB_TOKEN || process.env.GITHUB_TOKEN) {
+		return { provider: 'github-models' };
+	}
+
+	if (process.env.OLLAMA_HOST) {
+		return { provider: 'ollama' };
+	}
+
+	// No provider detected — AI disabled silently
+	return null;
 }

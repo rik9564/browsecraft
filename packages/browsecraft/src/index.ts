@@ -30,11 +30,15 @@ export type { TestFixtures, TestCase, TestOptions, TestResult } from './test.js'
 export { expect, AssertionError } from './expect.js';
 
 // Configuration
-export { defineConfig, resolveConfig } from './config.js';
+export { defineConfig, resolveConfig, resolveAIConfig } from './config.js';
 export type {
 	BrowsecraftConfig,
 	UserConfig,
 	AIConfig,
+	GitHubModelsConfig,
+	OpenAIConfig,
+	AnthropicConfig,
+	OllamaConfig,
 	BddConfig,
 	ExecutionStrategy,
 } from './config.js';

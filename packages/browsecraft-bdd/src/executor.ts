@@ -40,6 +40,7 @@ import {
 	globalRegistry,
 } from './step-registry.js';
 
+import type { AIStepExecutor } from './ai-step-executor.js';
 import { type HookContext, type HookRegistry, globalHookRegistry } from './hooks.js';
 import { type TagExpression, evaluateTagExpression, parseTagExpression } from './tags.js';
 
@@ -138,6 +139,20 @@ export interface ExecutorOptions {
 	registry?: StepRegistry;
 	/** Hook registry to use. Defaults to globalHookRegistry. */
 	hooks?: HookRegistry;
+	/**
+	 * AI step executor — when a step has no registered definition, the AI
+	 * interprets the step text and executes the appropriate page actions.
+	 * Set this to completely replace registerBuiltInSteps() with zero-maintenance AI.
+	 *
+	 * ```ts
+	 * import { createAIStepExecutor } from 'browsecraft-bdd';
+	 *
+	 * const executor = new BddExecutor({
+	 *   aiStepExecutor: createAIStepExecutor({ debug: true }),
+	 * });
+	 * ```
+	 */
+	aiStepExecutor?: AIStepExecutor;
 	/** Tag filter expression. Only scenarios matching this expression will run. */
 	tagFilter?: string;
 	/** Default step timeout in milliseconds. Default: 30000 */
@@ -187,10 +202,12 @@ export class BddExecutor {
 	private readonly hooks: HookRegistry;
 	private readonly options: ExecutorOptions;
 	private readonly tagFilter: TagExpression | null;
+	private readonly aiExecutor: AIStepExecutor | null;
 
 	constructor(options: ExecutorOptions = {}) {
 		this.registry = options.registry ?? globalRegistry;
 		this.hooks = options.hooks ?? globalHookRegistry;
+		this.aiExecutor = options.aiStepExecutor ?? null;
 		this.options = {
 			stepTimeout: 30000,
 			failFast: false,
@@ -464,9 +481,24 @@ export class BddExecutor {
 		this.options.onScenarioStart?.(scenario, featureName);
 
 		// Create world for this scenario
-		const world = this.options.worldFactory
-			? await this.options.worldFactory()
-			: createDefaultWorld();
+		let world: StepWorld;
+		try {
+			world = this.options.worldFactory ? await this.options.worldFactory() : createDefaultWorld();
+		} catch (err) {
+			// worldFactory failed (e.g., browser crashed, page creation failed)
+			const error = err instanceof Error ? err : new Error(String(err));
+			const result: ScenarioResult = {
+				name: scenario.name,
+				status: 'failed',
+				steps: [],
+				duration: Date.now() - scenarioStart,
+				tags,
+				line: scenario.line,
+				hookError: error,
+			};
+			this.options.onScenarioEnd?.(result, featureName);
+			return result;
+		}
 
 		const hookContext: HookContext = {
 			world,
@@ -638,7 +670,44 @@ export class BddExecutor {
 		const match = this.registry.match(step.text, matchType, scenarioTags);
 
 		if (!match) {
-			// Undefined step
+			// No registered step definition — try AI step executor
+			if (this.aiExecutor && world.page) {
+				const aiResult = await this.aiExecutor.executeStep(
+					step.text,
+					step.keyword.trim(),
+					world.page,
+				);
+
+				if (aiResult.handled) {
+					const status = aiResult.passed ? 'passed' : 'failed';
+					const result: StepResult = {
+						text: step.text,
+						keyword: step.keyword,
+						status,
+						duration: Date.now() - stepStart,
+						error: aiResult.error,
+						line: step.line,
+						attachments,
+						logs: [
+							...logs,
+							`[AI] ${aiResult.cached ? 'cached' : 'interpreted'} (${aiResult.aiTime}ms AI + ${aiResult.execTime}ms exec)`,
+							...(aiResult.plan ? [`[AI] ${aiResult.plan.explanation}`] : []),
+						],
+					};
+
+					hookContext.error = aiResult.error;
+					try {
+						await this.hooks.runHooks('afterStep', hookContext);
+					} catch {
+						/* ignore */
+					}
+
+					this.options.onStepEnd?.(result, '');
+					return result;
+				}
+			}
+
+			// No AI executor or AI couldn't handle it — undefined step
 			const result: StepResult = {
 				text: step.text,
 				keyword: step.keyword,
@@ -679,10 +748,13 @@ export class BddExecutor {
 			const stepPromise = match.definition.fn(world, ...args);
 
 			if (stepPromise instanceof Promise) {
+				let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 				await Promise.race([
-					stepPromise,
-					new Promise<never>((_, reject) =>
-						setTimeout(
+					stepPromise.finally(() => {
+						if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+					}),
+					new Promise<never>((_, reject) => {
+						timeoutHandle = setTimeout(
 							() =>
 								reject(
 									new Error(
@@ -690,8 +762,8 @@ export class BddExecutor {
 									),
 								),
 							this.options.stepTimeout,
-						),
-					),
+						);
+					}),
 				]);
 			}
 

@@ -22,7 +22,10 @@ export interface BrowsecraftConfig {
 	strategy: 'parallel' | 'sequential' | 'matrix';
 	testMatch: string;
 	outputDir: string;
-	ai: 'auto' | 'off' | { provider: 'github-models'; model?: string; token?: string };
+	ai:
+		| 'auto'
+		| 'off'
+		| { provider: string; model?: string; token?: string; apiKey?: string; baseUrl?: string };
 	debug: boolean;
 }
 
