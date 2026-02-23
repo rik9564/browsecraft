@@ -6,10 +6,7 @@
 // ============================================================================
 
 import assert from 'node:assert/strict';
-import {
-	EventBus,
-	WorkerPool,
-} from '../../packages/browsecraft-runner/dist/index.js';
+import { EventBus, WorkerPool } from '../../packages/browsecraft-runner/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';
@@ -37,7 +34,9 @@ function mockSpawner(delay = 0) {
 		spawner: async (worker) => {
 			if (delay > 0) await new Promise((r) => setTimeout(r, delay));
 			return {
-				close: async () => { closed.push(worker.id); },
+				close: async () => {
+					closed.push(worker.id);
+				},
 			};
 		},
 		closed,
@@ -102,8 +101,12 @@ await test('spawn emits worker:error on failure', async () => {
 	const pool = new WorkerPool(bus, { browsers: { chrome: 1 } });
 
 	try {
-		await pool.spawn(async () => { throw new Error('launch fail'); });
-	} catch { /* expected */ }
+		await pool.spawn(async () => {
+			throw new Error('launch fail');
+		});
+	} catch {
+		/* expected */
+	}
 
 	const errors = bus.getEventsOfType('worker:error');
 	assert.equal(errors.length, 1);
@@ -183,10 +186,7 @@ await test('execute returns empty array for empty items', async () => {
 await test('execute throws if no workers are idle', async () => {
 	const bus = new EventBus();
 	const pool = new WorkerPool(bus); // no spawn called
-	await assert.rejects(
-		() => pool.execute([makeItem('1')], mockExecutor()),
-		/No active workers/,
-	);
+	await assert.rejects(() => pool.execute([makeItem('1')], mockExecutor()), /No active workers/);
 });
 
 await test('execute emits item lifecycle events', async () => {
@@ -216,7 +216,7 @@ await test('execute emits item:fail for failed items', async () => {
 	const { spawner } = mockSpawner();
 	await pool.spawn(spawner);
 
-	const executor = mockExecutor({ '1': { status: 'failed', duration: 5, error: new Error('boom') } });
+	const executor = mockExecutor({ 1: { status: 'failed', duration: 5, error: new Error('boom') } });
 	await pool.execute([makeItem('1')], executor);
 
 	const fails = bus.getEventsOfType('item:fail');
@@ -231,7 +231,7 @@ await test('execute emits item:skip for skipped items', async () => {
 	const { spawner } = mockSpawner();
 	await pool.spawn(spawner);
 
-	const executor = mockExecutor({ '1': { status: 'skipped', duration: 0 } });
+	const executor = mockExecutor({ 1: { status: 'skipped', duration: 0 } });
 	await pool.execute([makeItem('1')], executor);
 
 	const skips = bus.getEventsOfType('item:skip');
@@ -302,7 +302,7 @@ await test('bail stops execution on first failure', async () => {
 
 	const items = [makeItem('1'), makeItem('2'), makeItem('3')];
 	const executor = mockExecutor({
-		'1': { status: 'failed', duration: 5, error: new Error('bail') },
+		1: { status: 'failed', duration: 5, error: new Error('bail') },
 	});
 	const results = await pool.execute(items, executor);
 
@@ -401,7 +401,9 @@ await test('executor throwing is caught and results in failure', async () => {
 	const { spawner } = mockSpawner();
 	await pool.spawn(spawner);
 
-	const executor = async () => { throw new Error('executor crash'); };
+	const executor = async () => {
+		throw new Error('executor crash');
+	};
 	const results = await pool.execute([makeItem('1')], executor);
 
 	assert.equal(results.length, 1);

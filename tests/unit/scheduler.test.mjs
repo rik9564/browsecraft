@@ -6,11 +6,7 @@
 // ============================================================================
 
 import assert from 'node:assert/strict';
-import {
-	EventBus,
-	WorkerPool,
-	Scheduler,
-} from '../../packages/browsecraft-runner/dist/index.js';
+import { EventBus, Scheduler, WorkerPool } from '../../packages/browsecraft-runner/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';

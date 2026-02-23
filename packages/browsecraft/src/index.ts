@@ -31,7 +31,13 @@ export { expect, AssertionError } from './expect.js';
 
 // Configuration
 export { defineConfig, resolveConfig } from './config.js';
-export type { BrowsecraftConfig, UserConfig, AIConfig, BddConfig, ExecutionStrategy } from './config.js';
+export type {
+	BrowsecraftConfig,
+	UserConfig,
+	AIConfig,
+	BddConfig,
+	ExecutionStrategy,
+} from './config.js';
 
 // Browser & Page (for advanced usage / scripting)
 export { Browser, BrowserContext } from './browser.js';

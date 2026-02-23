@@ -6,9 +6,7 @@
 // ============================================================================
 
 import assert from 'node:assert/strict';
-import {
-	ResultAggregator,
-} from '../../packages/browsecraft-runner/dist/index.js';
+import { ResultAggregator } from '../../packages/browsecraft-runner/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';
@@ -197,9 +195,7 @@ test('not-run status is excluded from inconsistency check', () => {
 
 test('detects flaky tests (passed after retries)', () => {
 	const agg = new ResultAggregator();
-	const results = [
-		makeResult('1', 'chrome', 'passed', 100, { retries: 2 }),
-	];
+	const results = [makeResult('1', 'chrome', 'passed', 100, { retries: 2 })];
 	const sr = makeSchedulerResult(results, ['chrome']);
 	const summary = agg.aggregate(sr);
 
@@ -222,9 +218,7 @@ test('non-flaky: failed with retries is not flaky', () => {
 
 test('non-flaky: passed without retries is not flaky', () => {
 	const agg = new ResultAggregator();
-	const results = [
-		makeResult('1', 'chrome', 'passed', 100),
-	];
+	const results = [makeResult('1', 'chrome', 'passed', 100)];
 	const sr = makeSchedulerResult(results, ['chrome']);
 	const summary = agg.aggregate(sr);
 

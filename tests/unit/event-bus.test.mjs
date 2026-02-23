@@ -34,7 +34,9 @@ console.log('\n\x1b[1mEventBus Tests\x1b[0m\n');
 test('emits events to listeners', () => {
 	const bus = new EventBus();
 	let received = null;
-	bus.on('run:start', (payload) => { received = payload; });
+	bus.on('run:start', (payload) => {
+		received = payload;
+	});
 	bus.emit('run:start', { browsers: ['chrome'], totalItems: 5, workers: 2 });
 	assert.deepStrictEqual(received, { browsers: ['chrome'], totalItems: 5, workers: 2 });
 });
@@ -52,8 +54,12 @@ test('different events are independent', () => {
 	const bus = new EventBus();
 	let spawnCalled = false;
 	let readyCalled = false;
-	bus.on('worker:spawn', () => { spawnCalled = true; });
-	bus.on('worker:ready', () => { readyCalled = true; });
+	bus.on('worker:spawn', () => {
+		spawnCalled = true;
+	});
+	bus.on('worker:ready', () => {
+		readyCalled = true;
+	});
 	bus.emit('worker:spawn', { id: 'x', browser: 'chrome', index: 0 });
 	assert.equal(spawnCalled, true);
 	assert.equal(readyCalled, false);
@@ -73,7 +79,9 @@ test('emitting event with no listeners does not throw', () => {
 test('on() returns an unsubscribe function', () => {
 	const bus = new EventBus();
 	let count = 0;
-	const unsub = bus.on('worker:idle', () => { count++; });
+	const unsub = bus.on('worker:idle', () => {
+		count++;
+	});
 	bus.emit('worker:idle', { id: 'x', browser: 'chrome', index: 0 });
 	assert.equal(count, 1);
 	unsub();
@@ -84,21 +92,44 @@ test('on() returns an unsubscribe function', () => {
 test('off() removes all listeners for an event', () => {
 	const bus = new EventBus();
 	let count = 0;
-	bus.on('item:pass', () => { count++; });
-	bus.on('item:pass', () => { count++; });
+	bus.on('item:pass', () => {
+		count++;
+	});
+	bus.on('item:pass', () => {
+		count++;
+	});
 	bus.off('item:pass');
-	bus.emit('item:pass', { item: { id: '1', title: 't', file: 'f', suitePath: [] }, worker: { id: 'x', browser: 'chrome', index: 0 }, status: 'passed', duration: 10 });
+	bus.emit('item:pass', {
+		item: { id: '1', title: 't', file: 'f', suitePath: [] },
+		worker: { id: 'x', browser: 'chrome', index: 0 },
+		status: 'passed',
+		duration: 10,
+	});
 	assert.equal(count, 0);
 });
 
 test('off() with no args removes all listeners', () => {
 	const bus = new EventBus();
 	let count = 0;
-	bus.on('item:pass', () => { count++; });
-	bus.on('item:fail', () => { count++; });
+	bus.on('item:pass', () => {
+		count++;
+	});
+	bus.on('item:fail', () => {
+		count++;
+	});
 	bus.off();
-	bus.emit('item:pass', { item: { id: '1', title: 't', file: 'f', suitePath: [] }, worker: { id: 'x', browser: 'chrome', index: 0 }, status: 'passed', duration: 10 });
-	bus.emit('item:fail', { item: { id: '1', title: 't', file: 'f', suitePath: [] }, worker: { id: 'x', browser: 'chrome', index: 0 }, status: 'failed', duration: 10 });
+	bus.emit('item:pass', {
+		item: { id: '1', title: 't', file: 'f', suitePath: [] },
+		worker: { id: 'x', browser: 'chrome', index: 0 },
+		status: 'passed',
+		duration: 10,
+	});
+	bus.emit('item:fail', {
+		item: { id: '1', title: 't', file: 'f', suitePath: [] },
+		worker: { id: 'x', browser: 'chrome', index: 0 },
+		status: 'failed',
+		duration: 10,
+	});
 	assert.equal(count, 0);
 });
 
@@ -109,7 +140,9 @@ test('off() with no args removes all listeners', () => {
 test('once() fires only once', () => {
 	const bus = new EventBus();
 	let count = 0;
-	bus.once('worker:spawn', () => { count++; });
+	bus.once('worker:spawn', () => {
+		count++;
+	});
 	bus.emit('worker:spawn', { id: 'x', browser: 'chrome', index: 0 });
 	bus.emit('worker:spawn', { id: 'x', browser: 'chrome', index: 0 });
 	bus.emit('worker:spawn', { id: 'x', browser: 'chrome', index: 0 });
@@ -119,7 +152,9 @@ test('once() fires only once', () => {
 test('once() returns an unsubscribe that works before firing', () => {
 	const bus = new EventBus();
 	let count = 0;
-	const unsub = bus.once('worker:spawn', () => { count++; });
+	const unsub = bus.once('worker:spawn', () => {
+		count++;
+	});
 	unsub();
 	bus.emit('worker:spawn', { id: 'x', browser: 'chrome', index: 0 });
 	assert.equal(count, 0);
@@ -132,8 +167,12 @@ test('once() returns an unsubscribe that works before firing', () => {
 test('listener errors do not break other listeners', () => {
 	const bus = new EventBus();
 	let secondCalled = false;
-	bus.on('worker:spawn', () => { throw new Error('boom'); });
-	bus.on('worker:spawn', () => { secondCalled = true; });
+	bus.on('worker:spawn', () => {
+		throw new Error('boom');
+	});
+	bus.on('worker:spawn', () => {
+		secondCalled = true;
+	});
 	bus.emit('worker:spawn', { id: 'x', browser: 'chrome', index: 0 });
 	assert.equal(secondCalled, true);
 });
@@ -239,7 +278,9 @@ test('history events have timestamps', () => {
 test('progress event carries completion data', () => {
 	const bus = new EventBus();
 	let data = null;
-	bus.on('progress', (p) => { data = p; });
+	bus.on('progress', (p) => {
+		data = p;
+	});
 	bus.emit('progress', { completed: 3, total: 10, passed: 2, failed: 1, skipped: 0, elapsed: 500 });
 	assert.equal(data.completed, 3);
 	assert.equal(data.total, 10);
