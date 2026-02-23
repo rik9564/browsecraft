@@ -1,5 +1,20 @@
 # browsecraft
 
+## 0.6.0
+
+### Minor Changes
+
+- [`1eef842`](https://github.com/rik9564/browsecraft/commit/1eef842c1e89a07f0b6445f1b36ba9b044be7384) Thanks [@rik9564](https://github.com/rik9564)! - - Added runtime AI steps mode (`--ai-steps`) with support for auto, locked, and warm modes.
+  - Fixed window positioning in headed mode via raw CDP commands.
+  - Redesigned orphan tab cleanup and fixed `page.fill/type/select` matching behavior.
+
+### Patch Changes
+
+- Updated dependencies [[`1eef842`](https://github.com/rik9564/browsecraft/commit/1eef842c1e89a07f0b6445f1b36ba9b044be7384)]:
+  - browsecraft-bdd@0.6.0
+  - browsecraft-bidi@0.6.0
+  - browsecraft-runner@0.6.0
+
 ## 0.5.1
 
 ### Patch Changes
