@@ -5,6 +5,8 @@
 //
 // npx browsecraft test              # Run all tests
 // npx browsecraft test login.test.ts # Run specific file
+// npx browsecraft bdd               # Run BDD feature files
+// npx browsecraft bdd login.feature # Run specific feature
 // npx browsecraft init              # Scaffold a new project
 // npx browsecraft --help            # Show help
 // ============================================================================
@@ -39,6 +41,10 @@ async function main() {
 		case 'test':
 			await runTests(args.slice(1));
 			break;
+		case 'bdd':
+			// "browsecraft bdd" is shorthand for "browsecraft test --bdd"
+			await runTests(['--bdd', ...args.slice(1)]);
+			break;
 		case 'init':
 			await initProject();
 			break;
@@ -46,8 +52,10 @@ async function main() {
 			await setupIde();
 			break;
 		default:
-			// If no command, assume it's a file path to test
-			if (command && (command.endsWith('.ts') || command.endsWith('.js'))) {
+			// If no command, infer from file extension
+			if (command?.endsWith('.feature')) {
+				await runTests(['--bdd', ...args]);
+			} else if (command?.endsWith('.ts') || command?.endsWith('.js')) {
 				await runTests(args);
 			} else {
 				console.error(`Unknown command: ${command}`);
@@ -1017,12 +1025,14 @@ function printHelp() {
 
   Usage:
     browsecraft test [files...] [options]
+    browsecraft bdd [features...] [options]
     browsecraft test --bdd [features...] [options]
     browsecraft init
     browsecraft setup-ide
 
   Commands:
     test          Run browser tests
+    bdd           Run BDD feature files (shorthand for test --bdd)
     test --bdd    Run BDD feature files (Gherkin)
     init          Create a new project with example config and test
     setup-ide     Configure VS Code for Cucumber step discovery
@@ -1045,9 +1055,11 @@ function printHelp() {
     -v, --version       Show version
 
   BDD Examples:
-    browsecraft test --bdd                                  # All features, 1 browser
-    browsecraft test --bdd features/login.feature           # Single feature
-    browsecraft test --bdd features/login.feature:15        # Specific scenario by line
+    browsecraft bdd                                         # All features, 1 browser
+    browsecraft bdd features/login.feature                  # Single feature
+    browsecraft bdd features/login.feature:15               # Specific scenario by line
+    browsecraft bdd --headed                                # Watch it run
+    browsecraft test --bdd features/login.feature           # Equivalent long form
     browsecraft test --bdd --scenario "Valid login"         # Specific scenario by name
     browsecraft test --bdd --tag "@smoke"                   # Tag filter
     browsecraft test --bdd --grep "checkout"                # Name filter
