@@ -842,6 +842,142 @@ await testAsync('executor handles split document sets correctly', async () => {
 });
 
 // -----------------------------------------------------------------------
+// BddExecutor — grep filter
+// -----------------------------------------------------------------------
+
+await testAsync('executor grep filter runs only matching scenarios', async () => {
+	const registry = new StepRegistry();
+	registry.register('Given', /^a step$/, async () => {});
+
+	const executor = new BddExecutor({
+		registry,
+		hooks: new HookRegistry(),
+		grep: 'Valid',
+		worldFactory: () => ({ page: null, browser: null, ctx: {}, attach: () => {}, log: () => {} }),
+	});
+
+	const doc = parseGherkin(
+		`Feature: Grep test
+  Scenario: Valid login
+    Given a step
+
+  Scenario: Invalid login
+    Given a step
+
+  Scenario: Valid checkout
+    Given a step
+`,
+		'grep.feature',
+	);
+
+	const result = await executor.run([doc]);
+	assert.equal(result.summary.scenarios.total, 3);
+	assert.equal(result.summary.scenarios.passed, 2);   // Valid login + Valid checkout
+	assert.equal(result.summary.scenarios.skipped, 1);   // Invalid login
+});
+
+// -----------------------------------------------------------------------
+// BddExecutor — scenarioFilter (line number targeting)
+// -----------------------------------------------------------------------
+
+await testAsync('executor scenarioFilter skips non-matching scenarios', async () => {
+	const registry = new StepRegistry();
+	registry.register('Given', /^a step$/, async () => {});
+
+	const doc = parseGherkin(
+		`Feature: Line filter
+  Scenario: First
+    Given a step
+
+  Scenario: Second
+    Given a step
+`,
+		'line-filter.feature',
+	);
+
+	// Get the actual line numbers from the parsed document
+	const scenarios = doc.feature.children.map((c) => c.scenario);
+	const targetLine = scenarios[1].line; // "Second" scenario's line
+
+	const executor = new BddExecutor({
+		registry,
+		hooks: new HookRegistry(),
+		scenarioFilter: (scenario) => scenario.line === targetLine,
+		worldFactory: () => ({ page: null, browser: null, ctx: {}, attach: () => {}, log: () => {} }),
+	});
+
+	const result = await executor.run([doc]);
+	assert.equal(result.summary.scenarios.total, 2);
+	assert.equal(result.summary.scenarios.passed, 1);
+	assert.equal(result.summary.scenarios.skipped, 1);
+	// The passed scenario should be "Second"
+	const passedScenario = result.features[0].scenarios.find((s) => s.status === 'passed');
+	assert.equal(passedScenario.name, 'Second');
+});
+
+await testAsync('executor scenarioFilter receives uri', async () => {
+	const registry = new StepRegistry();
+	registry.register('Given', /^a step$/, async () => {});
+
+	const doc = parseGherkin(
+		`Feature: URI test
+  Scenario: One
+    Given a step
+`,
+		'my-feature.feature',
+	);
+
+	let receivedUri = null;
+	const executor = new BddExecutor({
+		registry,
+		hooks: new HookRegistry(),
+		scenarioFilter: (_scenario, _tags, uri) => {
+			receivedUri = uri;
+			return true;
+		},
+		worldFactory: () => ({ page: null, browser: null, ctx: {}, attach: () => {}, log: () => {} }),
+	});
+
+	await executor.run([doc]);
+	assert.equal(receivedUri, 'my-feature.feature');
+});
+
+await testAsync('grep and tagFilter can combine', async () => {
+	const registry = new StepRegistry();
+	registry.register('Given', /^a step$/, async () => {});
+
+	const executor = new BddExecutor({
+		registry,
+		hooks: new HookRegistry(),
+		tagFilter: '@api',
+		grep: 'Create',
+		worldFactory: () => ({ page: null, browser: null, ctx: {}, attach: () => {}, log: () => {} }),
+	});
+
+	const doc = parseGherkin(
+		`Feature: Combined filter
+  @api
+  Scenario: Create user
+    Given a step
+
+  @api
+  Scenario: Delete user
+    Given a step
+
+  @ui
+  Scenario: Create form
+    Given a step
+`,
+		'combined.feature',
+	);
+
+	const result = await executor.run([doc]);
+	assert.equal(result.summary.scenarios.total, 3);
+	assert.equal(result.summary.scenarios.passed, 1);   // @api + "Create" = only "Create user"
+	assert.equal(result.summary.scenarios.skipped, 2);
+});
+
+// -----------------------------------------------------------------------
 // Summary
 // -----------------------------------------------------------------------
 

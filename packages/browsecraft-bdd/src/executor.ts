@@ -155,6 +155,18 @@ export interface ExecutorOptions {
 	aiStepExecutor?: AIStepExecutor;
 	/** Tag filter expression. Only scenarios matching this expression will run. */
 	tagFilter?: string;
+	/** Grep pattern — only run scenarios whose name contains this string. */
+	grep?: string;
+	/**
+	 * Custom scenario filter. Return `true` to run, `false` to skip.
+	 * Called after tag filter and grep. Receives the scenario, its
+	 * inherited tags, and the source file URI.
+	 *
+	 * ```ts
+	 * scenarioFilter: (scenario, tags, uri) => scenario.line === 15
+	 * ```
+	 */
+	scenarioFilter?: (scenario: Scenario, tags: string[], uri?: string) => boolean;
 	/** Default step timeout in milliseconds. Default: 30000 */
 	stepTimeout?: number;
 	/** Whether to stop on first failure. Default: false */
@@ -202,12 +214,16 @@ export class BddExecutor {
 	private readonly hooks: HookRegistry;
 	private readonly options: ExecutorOptions;
 	private readonly tagFilter: TagExpression | null;
+	private readonly grepPattern: string | null;
+	private readonly scenarioFilter: ((scenario: Scenario, tags: string[], uri?: string) => boolean) | null;
 	private readonly aiExecutor: AIStepExecutor | null;
 
 	constructor(options: ExecutorOptions = {}) {
 		this.registry = options.registry ?? globalRegistry;
 		this.hooks = options.hooks ?? globalHookRegistry;
 		this.aiExecutor = options.aiStepExecutor ?? null;
+		this.grepPattern = options.grep ?? null;
+		this.scenarioFilter = options.scenarioFilter ?? null;
 		this.options = {
 			stepTimeout: 30000,
 			failFast: false,
@@ -286,6 +302,7 @@ export class BddExecutor {
 						featureTags,
 						featureBackground,
 						feature.name,
+						uri,
 					);
 					scenarioResults.push(...results);
 
@@ -298,6 +315,7 @@ export class BddExecutor {
 						featureTags,
 						featureBackground,
 						feature.name,
+						uri,
 					);
 					scenarioResults.push(...ruleResults);
 
@@ -343,6 +361,7 @@ export class BddExecutor {
 		featureTags: string[],
 		featureBackground: Background | null,
 		featureName: string,
+		uri?: string,
 	): Promise<ScenarioResult[]> {
 		const ruleTags = [...featureTags, ...rule.tags.map((t) => t.name)];
 		const ruleBackground = this.findBackground(rule.children) ?? featureBackground;
@@ -355,6 +374,7 @@ export class BddExecutor {
 					ruleTags,
 					ruleBackground,
 					featureName,
+					uri,
 				);
 				results.push(...scenarioResults);
 
@@ -376,11 +396,40 @@ export class BddExecutor {
 		parentTags: string[],
 		background: Background | null,
 		featureName: string,
+		uri?: string,
 	): Promise<ScenarioResult[]> {
 		const scenarioTags = [...parentTags, ...scenario.tags.map((t) => t.name)];
 
 		// Check tag filter
 		if (this.tagFilter && !evaluateTagExpression(this.tagFilter, scenarioTags)) {
+			return [
+				{
+					name: scenario.name,
+					status: 'skipped',
+					steps: [],
+					duration: 0,
+					tags: scenarioTags,
+					line: scenario.line,
+				},
+			];
+		}
+
+		// Check grep filter — scenario name must contain the pattern
+		if (this.grepPattern && !scenario.name.includes(this.grepPattern)) {
+			return [
+				{
+					name: scenario.name,
+					status: 'skipped',
+					steps: [],
+					duration: 0,
+					tags: scenarioTags,
+					line: scenario.line,
+				},
+			];
+		}
+
+		// Check custom scenario filter
+		if (this.scenarioFilter && !this.scenarioFilter(scenario, scenarioTags, uri)) {
 			return [
 				{
 					name: scenario.name,

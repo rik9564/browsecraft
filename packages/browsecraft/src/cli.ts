@@ -205,18 +205,38 @@ async function runBddTests(
 	// Tag filter: --tag  or  bddConfig.tagFilter
 	const tagFilter = flags?.tag ?? bddConfig.tagFilter;
 
-	// Grep: --grep  or  bddConfig.grep
-	const grepPattern = flags?.grep ?? bddConfig.grep;
+	// Grep: --grep or --scenario  or  bddConfig.grep
+	const grepPattern = flags?.scenario ?? flags?.grep ?? bddConfig.grep;
 
 	// Fail fast: --bail
 	const failFast = flags?.bail ?? false;
 
 	// ── Step 1: Discover .feature files ────────────────────────────────
+	// Parse feature:line syntax (e.g. features/login.feature:15)
+	const targetLines = new Map<string, number[]>(); // file → line numbers
 	let featureFiles: string[];
 
 	if (filePatterns && filePatterns.length > 0) {
 		// Explicit feature files from CLI positional args
-		featureFiles = filePatterns.map((f) => resolve(cwd, f)).filter((f) => existsSync(f));
+		const resolvedPaths: string[] = [];
+		for (const pattern of filePatterns) {
+			const [filePart, linePart] = pattern.split(':');
+			const absPath = resolve(cwd, filePart!);
+			if (!existsSync(absPath)) continue;
+
+			if (!resolvedPaths.includes(absPath)) {
+				resolvedPaths.push(absPath);
+			}
+			if (linePart) {
+				const lineNum = Number.parseInt(linePart, 10);
+				if (!Number.isNaN(lineNum)) {
+					const existing = targetLines.get(absPath) ?? [];
+					existing.push(lineNum);
+					targetLines.set(absPath, existing);
+				}
+			}
+		}
+		featureFiles = resolvedPaths;
 		if (featureFiles.length === 0) {
 			console.error('\n  No matching feature files found.\n');
 			process.exit(1);
@@ -260,6 +280,20 @@ async function runBddTests(
 		return parseGherkin(source, relative(cwd, file));
 	});
 
+	// Build a scenario filter for line-number targeting
+	const lineFilter =
+		targetLines.size > 0
+			? (scenario: { line: number; name: string }, _tags: string[], uri?: string) => {
+					for (const [file, lines] of targetLines) {
+						const relPath = relative(cwd, file);
+						if (uri === relPath || uri === file) {
+							return lines.includes(scenario.line);
+						}
+					}
+					return true; // no line constraint for this file
+				}
+			: undefined;
+
 	// ── Step 4: Determine execution plan ───────────────────────────────
 	const isMultiBrowser = browserNames.length > 1;
 	const isParallel = workers > 1;
@@ -272,6 +306,12 @@ async function runBddTests(
 	if (isParallel) parts.push(`(${workers} workers)`);
 	if (tagFilter) parts.push(`[tags: ${tagFilter}]`);
 	if (grepPattern) parts.push(`[grep: ${grepPattern}]`);
+	if (targetLines.size > 0) {
+		const lineDescs = [...targetLines.entries()].map(
+			([f, ls]) => `${relative(cwd, f)}:${ls.join(',')}`,
+		);
+		parts.push(`[lines: ${lineDescs.join(' ')}]`);
+	}
 
 	console.log(`\n  Browsecraft BDD - Running ${parts.join(' ')}\n`);
 
@@ -307,6 +347,8 @@ async function runBddTests(
 			new BddExecutor({
 				stepTimeout: config.timeout,
 				tagFilter: tagFilter ?? undefined,
+				grep: grepPattern ?? undefined,
+				scenarioFilter: lineFilter ?? undefined,
 				failFast,
 				worldFactory: async () => {
 					const context = await browser.newContext();
@@ -324,8 +366,6 @@ async function runBddTests(
 					console.log(`\n  ${prefix}Feature: ${feature.name}`);
 				},
 				onScenarioStart: (scenario) => {
-					// Grep filter — skip scenarios that don't match
-					if (grepPattern && !scenario.name.includes(grepPattern)) return;
 					console.log(`    ${prefix}Scenario: ${scenario.name}`);
 				},
 				onStepEnd: (result) => {
@@ -915,6 +955,8 @@ interface CLIFlags {
 	tag?: string;
 	/** Execution strategy: parallel, sequential, or matrix */
 	strategy?: string;
+	/** BDD scenario name filter (alias for --grep in BDD mode) */
+	scenario?: string;
 }
 
 function parseFlags(args: string[]): CLIFlags {
@@ -961,6 +1003,9 @@ function parseFlags(args: string[]): CLIFlags {
 			case '--strategy':
 				flags.strategy = args[++i];
 				break;
+			case '--scenario':
+				flags.scenario = args[++i];
+				break;
 		}
 	}
 
@@ -996,6 +1041,7 @@ function printHelp() {
     --timeout <ms>      Global timeout in milliseconds (default: 30000)
     --retries <n>       Retry failed tests n times (default: 0)
     --grep <pattern>    Only run tests/scenarios matching pattern
+    --scenario <name>   Run only scenarios whose name contains <name>
     --tag <expr>        BDD tag filter: "@smoke", "@smoke and not @wip"
     --strategy <s>      Multi-browser strategy: parallel, sequential, matrix
     --bail              Stop after first failure
@@ -1006,6 +1052,8 @@ function printHelp() {
   BDD Examples:
     browsecraft test --bdd                                  # All features, 1 browser
     browsecraft test --bdd features/login.feature           # Single feature
+    browsecraft test --bdd features/login.feature:15        # Specific scenario by line
+    browsecraft test --bdd --scenario "Valid login"         # Specific scenario by name
     browsecraft test --bdd --tag "@smoke"                   # Tag filter
     browsecraft test --bdd --grep "checkout"                # Name filter
     browsecraft test --bdd --workers 4                      # 4 features in parallel
