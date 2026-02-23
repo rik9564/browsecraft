@@ -41,6 +41,9 @@ async function main() {
 		case 'init':
 			await initProject();
 			break;
+		case 'setup-ide':
+			await setupIde();
+			break;
 		default:
 			// If no command, assume it's a file path to test
 			if (command && (command.endsWith('.ts') || command.endsWith('.js'))) {
@@ -449,6 +452,151 @@ test('can navigate to more info', async ({ page }) => {
 }
 
 // ---------------------------------------------------------------------------
+// Setup IDE — configures VS Code for Cucumber/Gherkin step discovery
+// ---------------------------------------------------------------------------
+
+async function setupIde() {
+	const cwd = process.cwd();
+
+	console.log('\n  Browsecraft — IDE Setup\n');
+	console.log('  Configuring VS Code for Cucumber/Gherkin step discovery...\n');
+
+	// Detect steps directory
+	const stepsDir = existsSync(join(cwd, 'steps'))
+		? 'steps'
+		: existsSync(join(cwd, 'step-definitions'))
+			? 'step-definitions'
+			: existsSync(join(cwd, 'step_definitions'))
+				? 'step_definitions'
+				: 'steps';
+
+	// Detect features directory
+	const featuresDir = existsSync(join(cwd, 'features'))
+		? 'features'
+		: existsSync(join(cwd, 'test/features'))
+			? 'test/features'
+			: 'features';
+
+	// Resolve the browsecraft-bdd glue path
+	let gluePath = 'node_modules/browsecraft-bdd/glue/steps.js';
+	try {
+		const { createRequire } = await import('node:module');
+		const userRequire = createRequire(join(cwd, 'package.json'));
+		const bddPkgPath = userRequire.resolve('browsecraft-bdd/package.json');
+		const bddDir = join(bddPkgPath, '..');
+		const relGlue = relative(cwd, join(bddDir, 'glue', 'steps.js')).replace(/\\/g, '/');
+		if (existsSync(join(bddDir, 'glue', 'steps.js'))) {
+			gluePath = relGlue;
+		}
+	} catch {
+		// browsecraft-bdd not installed yet — use default path
+	}
+
+	// Create .vscode directory
+	const vscodeDir = join(cwd, '.vscode');
+	if (!existsSync(vscodeDir)) {
+		mkdirSync(vscodeDir, { recursive: true });
+		console.log('  \x1b[32mcreate\x1b[0m  .vscode/');
+	}
+
+	// Write or merge settings.json
+	const settingsPath = join(vscodeDir, 'settings.json');
+	const cucumberSettings: Record<string, unknown> = {
+		'cucumberautocomplete.steps': [
+			`${stepsDir}/**/*.ts`,
+			`${stepsDir}/**/*.js`,
+			gluePath,
+		],
+		'cucumberautocomplete.strictGherkinCompletion': true,
+		'cucumberautocomplete.strictGherkinValidation': true,
+		'cucumber.glue': [
+			`${stepsDir}/**/*.ts`,
+			`${stepsDir}/**/*.js`,
+			gluePath,
+		],
+		'cucumber.features': [`${featuresDir}/**/*.feature`],
+	};
+
+	if (existsSync(settingsPath)) {
+		try {
+			const existing = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+			let updated = false;
+			for (const [key, value] of Object.entries(cucumberSettings)) {
+				if (!(key in existing)) {
+					existing[key] = value;
+					updated = true;
+				}
+			}
+			if (updated) {
+				writeFileSync(settingsPath, JSON.stringify(existing, null, 2) + '\n', 'utf-8');
+				console.log('  \x1b[32mupdate\x1b[0m  .vscode/settings.json');
+			} else {
+				console.log('  \x1b[33mskip\x1b[0m    .vscode/settings.json \x1b[2m(already configured)\x1b[0m');
+			}
+		} catch {
+			writeFileSync(settingsPath, JSON.stringify(cucumberSettings, null, 2) + '\n', 'utf-8');
+			console.log('  \x1b[32mcreate\x1b[0m  .vscode/settings.json');
+		}
+	} else {
+		writeFileSync(settingsPath, JSON.stringify(cucumberSettings, null, 2) + '\n', 'utf-8');
+		console.log('  \x1b[32mcreate\x1b[0m  .vscode/settings.json');
+	}
+
+	// Write or merge extensions.json
+	const extensionsPath = join(vscodeDir, 'extensions.json');
+	const recommendedExtensions = [
+		'alexkrechik.cucumberautocomplete',
+		'CucumberOpen.cucumber-official',
+	];
+
+	if (existsSync(extensionsPath)) {
+		try {
+			const existing = JSON.parse(readFileSync(extensionsPath, 'utf-8'));
+			const recs: string[] = existing.recommendations ?? [];
+			let updated = false;
+			for (const ext of recommendedExtensions) {
+				if (!recs.includes(ext)) {
+					recs.push(ext);
+					updated = true;
+				}
+			}
+			if (updated) {
+				existing.recommendations = recs;
+				writeFileSync(extensionsPath, JSON.stringify(existing, null, 2) + '\n', 'utf-8');
+				console.log('  \x1b[32mupdate\x1b[0m  .vscode/extensions.json');
+			} else {
+				console.log('  \x1b[33mskip\x1b[0m    .vscode/extensions.json \x1b[2m(already configured)\x1b[0m');
+			}
+		} catch {
+			writeFileSync(
+				extensionsPath,
+				JSON.stringify({ recommendations: recommendedExtensions }, null, 2) + '\n',
+				'utf-8',
+			);
+			console.log('  \x1b[32mcreate\x1b[0m  .vscode/extensions.json');
+		}
+	} else {
+		writeFileSync(
+			extensionsPath,
+			JSON.stringify({ recommendations: recommendedExtensions }, null, 2) + '\n',
+			'utf-8',
+		);
+		console.log('  \x1b[32mcreate\x1b[0m  .vscode/extensions.json');
+	}
+
+	console.log('\n  \x1b[32mDone!\x1b[0m IDE configured for Cucumber/Gherkin support.\n');
+	console.log('  What was set up:');
+	console.log('    \x1b[36m•\x1b[0m Cucumber extension discovers your custom steps');
+	console.log('    \x1b[36m•\x1b[0m Cucumber extension discovers BrowseCraft\'s 38 built-in steps');
+	console.log('    \x1b[36m•\x1b[0m Ctrl+Click navigation from .feature files to step definitions');
+	console.log('    \x1b[36m•\x1b[0m Autocomplete suggestions when writing features');
+	console.log('    \x1b[36m•\x1b[0m Recommended Cucumber extensions for VS Code');
+	console.log();
+	console.log('  If prompted, install the recommended extensions when VS Code asks.');
+	console.log();
+}
+
+// ---------------------------------------------------------------------------
 // Config Loading
 // ---------------------------------------------------------------------------
 
@@ -629,11 +777,13 @@ function printHelp() {
     browsecraft test [files...] [options]
     browsecraft test --bdd [options]
     browsecraft init
+    browsecraft setup-ide
 
   Commands:
     test          Run browser tests
     test --bdd    Run BDD feature files (Gherkin)
     init          Create a new project with example config and test
+    setup-ide     Configure VS Code for Cucumber step discovery
 
   Options:
     --bdd               Run BDD feature files instead of programmatic tests
@@ -656,6 +806,7 @@ function printHelp() {
     browsecraft test --grep "login" --bail
     browsecraft test --bdd                       # Run all .feature files
     browsecraft test --bdd --headed              # Run BDD in headed mode
+    browsecraft setup-ide                        # Auto-configure IDE for BDD
 `);
 }
 

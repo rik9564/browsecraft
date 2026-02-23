@@ -316,6 +316,45 @@ test-results/
 }
 
 // ---------------------------------------------------------------------------
+// IDE Configuration Templates
+// ---------------------------------------------------------------------------
+
+function vscodeSettingsTemplate(): string {
+	return JSON.stringify(
+		{
+			'cucumberautocomplete.steps': [
+				'steps/**/*.ts',
+				'steps/**/*.js',
+				'node_modules/browsecraft-bdd/glue/steps.js',
+			],
+			'cucumberautocomplete.strictGherkinCompletion': true,
+			'cucumberautocomplete.strictGherkinValidation': true,
+			'cucumber.glue': [
+				'steps/**/*.ts',
+				'steps/**/*.js',
+				'node_modules/browsecraft-bdd/glue/steps.js',
+			],
+			'cucumber.features': ['features/**/*.feature'],
+		},
+		null,
+		2,
+	);
+}
+
+function vscodeExtensionsTemplate(): string {
+	return JSON.stringify(
+		{
+			recommendations: [
+				'alexkrechik.cucumberautocomplete',
+				'CucumberOpen.cucumber-official',
+			],
+		},
+		null,
+		2,
+	);
+}
+
+// ---------------------------------------------------------------------------
 // Core scaffolding
 // ---------------------------------------------------------------------------
 
@@ -430,10 +469,84 @@ function scaffold(options: Options) {
 			stepDefinitionsTemplate(ts),
 			`steps/steps.${ext}`,
 		);
+
+		// IDE configuration — auto-configure Cucumber extensions
+		setupIdeConfig(targetDir);
 	}
 
 	// .gitignore
 	patchGitignore(targetDir);
+}
+
+/**
+ * Set up IDE configuration for Cucumber/Gherkin support.
+ * Creates .vscode/settings.json and .vscode/extensions.json
+ * so that Cucumber IDE extensions can discover step definitions
+ * — including BrowseCraft's 38 built-in steps — with zero manual setup.
+ */
+function setupIdeConfig(targetDir: string) {
+	ensureDir(join(targetDir, '.vscode'), '.vscode');
+
+	// VS Code settings — Cucumber extension glue paths
+	const settingsPath = join(targetDir, '.vscode', 'settings.json');
+	if (existsSync(settingsPath)) {
+		// Merge cucumber settings into existing settings.json
+		try {
+			const existing = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+			const cucumberSettings = JSON.parse(vscodeSettingsTemplate());
+			let updated = false;
+
+			for (const [key, value] of Object.entries(cucumberSettings)) {
+				if (!(key in existing)) {
+					existing[key] = value;
+					updated = true;
+				}
+			}
+
+			if (updated) {
+				writeFileSync(settingsPath, JSON.stringify(existing, null, 2), 'utf-8');
+				console.log(`  ${fmt.green('update')}  .vscode/settings.json`);
+			} else {
+				console.log(
+					`  ${fmt.yellow('skip')}  .vscode/settings.json ${fmt.dim('(cucumber config already present)')}`,
+				);
+			}
+		} catch {
+			// Can't parse existing settings — write fresh
+			writeFile(settingsPath, vscodeSettingsTemplate(), '.vscode/settings.json');
+		}
+	} else {
+		writeFile(settingsPath, vscodeSettingsTemplate(), '.vscode/settings.json');
+	}
+
+	// VS Code extensions — recommend Cucumber extensions
+	const extensionsPath = join(targetDir, '.vscode', 'extensions.json');
+	if (existsSync(extensionsPath)) {
+		try {
+			const existing = JSON.parse(readFileSync(extensionsPath, 'utf-8'));
+			const recs: string[] = existing.recommendations ?? [];
+			const toAdd = [
+				'alexkrechik.cucumberautocomplete',
+				'CucumberOpen.cucumber-official',
+			];
+			let updated = false;
+			for (const ext of toAdd) {
+				if (!recs.includes(ext)) {
+					recs.push(ext);
+					updated = true;
+				}
+			}
+			if (updated) {
+				existing.recommendations = recs;
+				writeFileSync(extensionsPath, JSON.stringify(existing, null, 2), 'utf-8');
+				console.log(`  ${fmt.green('update')}  .vscode/extensions.json`);
+			}
+		} catch {
+			writeFile(extensionsPath, vscodeExtensionsTemplate(), '.vscode/extensions.json');
+		}
+	} else {
+		writeFile(extensionsPath, vscodeExtensionsTemplate(), '.vscode/extensions.json');
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -491,6 +604,8 @@ function printSuccess(options: Options, pm: PackageManager) {
 	if (options.bdd) {
 		console.log(`    ${fmt.cyan('features/example.feature')}  Example feature file`);
 		console.log(`    ${fmt.cyan(`steps/steps.${ext}`)}             Step definitions`);
+		console.log(`    ${fmt.cyan('.vscode/settings.json')}     Cucumber IDE config`);
+		console.log(`    ${fmt.cyan('.vscode/extensions.json')}  Recommended extensions`);
 	}
 	console.log();
 	console.log('  Next steps:');

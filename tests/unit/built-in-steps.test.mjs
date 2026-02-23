@@ -345,6 +345,75 @@ test('assertion steps are Then', () => {
 });
 
 // -----------------------------------------------------------------------
+// IDE Glue file — verify every built-in pattern is discoverable
+// -----------------------------------------------------------------------
+
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const glueFile = readFileSync(
+	join(__dirname, '..', '..', 'packages', 'browsecraft-bdd', 'glue', 'steps.js'),
+	'utf-8',
+);
+
+test('glue file exists and is not empty', () => {
+	assert.ok(glueFile.length > 0);
+});
+
+test('glue file contains Given/When/Then function stubs', () => {
+	assert.ok(glueFile.includes('function Given('));
+	assert.ok(glueFile.includes('function When('));
+	assert.ok(glueFile.includes('function Then('));
+});
+
+test('glue file contains every built-in step pattern', () => {
+	const patterns = getBuiltInStepPatterns();
+	const missing = [];
+	for (const { pattern } of patterns) {
+		// The glue file must contain the exact pattern string in single quotes
+		if (!glueFile.includes(`'${pattern}'`)) {
+			missing.push(pattern);
+		}
+	}
+	assert.equal(
+		missing.length,
+		0,
+		`Glue file is missing ${missing.length} step(s):\n    ${missing.join('\n    ')}`,
+	);
+});
+
+test('glue file has correct step types (Given for nav, When for action, Then for assert)', () => {
+	const patterns = getBuiltInStepPatterns();
+	const errors = [];
+	for (const { type, pattern } of patterns) {
+		// Find the line in glue file that registers this pattern
+		const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		const regex = new RegExp(`(Given|When|Then)\\('${escaped}'`);
+		const match = glueFile.match(regex);
+		if (match && match[1] !== type) {
+			errors.push(`${pattern}: expected ${type}, got ${match[1]}`);
+		}
+	}
+	assert.equal(
+		errors.length,
+		0,
+		`Glue file has wrong step types:\n    ${errors.join('\n    ')}`,
+	);
+});
+
+test('glue file does not import from browsecraft (it is standalone)', () => {
+	assert.ok(!glueFile.includes("from 'browsecraft"));
+	assert.ok(!glueFile.includes("require('browsecraft"));
+});
+
+test('glue file has IDE discovery header comment', () => {
+	assert.ok(glueFile.includes('IDE Discovery'));
+	assert.ok(glueFile.includes('Ctrl+Click'));
+});
+
+// -----------------------------------------------------------------------
 // Summary
 // -----------------------------------------------------------------------
 
