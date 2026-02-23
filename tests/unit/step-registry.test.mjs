@@ -6,14 +6,14 @@
 
 import assert from 'node:assert/strict';
 import {
-	StepRegistry,
 	BrowsecraftDataTable,
-	globalRegistry,
 	Given,
-	When,
-	Then,
 	Step,
+	StepRegistry,
+	Then,
+	When,
 	defineParameterType,
+	globalRegistry,
 } from '../../packages/browsecraft-bdd/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
@@ -130,10 +130,7 @@ test('type Any matches all keywords', () => {
 test('throws on duplicate step pattern', () => {
 	const reg = new StepRegistry();
 	reg.register('Given', 'I am here', () => {});
-	assert.throws(
-		() => reg.register('Given', 'I am here', () => {}),
-		/Duplicate step definition/,
-	);
+	assert.throws(() => reg.register('Given', 'I am here', () => {}), /Duplicate step definition/);
 });
 
 // -----------------------------------------------------------------------

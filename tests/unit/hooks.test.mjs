@@ -6,16 +6,16 @@
 
 import assert from 'node:assert/strict';
 import {
+	After,
+	AfterAll,
+	AfterFeature,
+	AfterStep,
+	Before,
+	BeforeAll,
+	BeforeFeature,
+	BeforeStep,
 	HookRegistry,
 	globalHookRegistry,
-	Before,
-	After,
-	BeforeAll,
-	AfterAll,
-	BeforeFeature,
-	AfterFeature,
-	BeforeStep,
-	AfterStep,
 } from '../../packages/browsecraft-bdd/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
@@ -103,10 +103,7 @@ test('hook without tag filter matches all tags', () => {
 
 test('throws when tag filter has no function', () => {
 	const reg = new HookRegistry();
-	assert.throws(
-		() => reg.register('beforeScenario', '@smoke'),
-		/no function provided/,
-	);
+	assert.throws(() => reg.register('beforeScenario', '@smoke'), /no function provided/);
 });
 
 // -----------------------------------------------------------------------
@@ -162,7 +159,9 @@ await testAsync('runHooks executes all matching hooks', async () => {
 await testAsync('runHooks passes context to hooks', async () => {
 	const reg = new HookRegistry();
 	let receivedCtx = null;
-	reg.register('beforeScenario', (ctx) => { receivedCtx = ctx; });
+	reg.register('beforeScenario', (ctx) => {
+		receivedCtx = ctx;
+	});
 	const ctx = { scenarioName: 'test', scenarioTags: ['@smoke'] };
 	await reg.runHooks('beforeScenario', ctx);
 	assert.equal(receivedCtx.scenarioName, 'test');
@@ -172,7 +171,7 @@ await testAsync('runHooks handles async hooks', async () => {
 	const reg = new HookRegistry();
 	let executed = false;
 	reg.register('beforeScenario', async () => {
-		await new Promise(r => setTimeout(r, 10));
+		await new Promise((r) => setTimeout(r, 10));
 		executed = true;
 	});
 	await reg.runHooks('beforeScenario', {});
@@ -182,7 +181,9 @@ await testAsync('runHooks handles async hooks', async () => {
 await testAsync('runHooks skips hooks with non-matching tags', async () => {
 	const reg = new HookRegistry();
 	let executed = false;
-	reg.register('beforeScenario', '@admin', () => { executed = true; });
+	reg.register('beforeScenario', '@admin', () => {
+		executed = true;
+	});
 	await reg.runHooks('beforeScenario', { scenarioTags: ['@user'] });
 	assert.equal(executed, false);
 });
@@ -290,10 +291,14 @@ test('Before with tag filter', () => {
 test('all 8 hook scopes work', () => {
 	const reg = new HookRegistry();
 	const scopes = [
-		'beforeAll', 'afterAll',
-		'beforeFeature', 'afterFeature',
-		'beforeScenario', 'afterScenario',
-		'beforeStep', 'afterStep',
+		'beforeAll',
+		'afterAll',
+		'beforeFeature',
+		'afterFeature',
+		'beforeScenario',
+		'afterScenario',
+		'beforeStep',
+		'afterStep',
 	];
 	for (const scope of scopes) {
 		reg.register(scope, () => {});

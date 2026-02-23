@@ -5,10 +5,7 @@
 // ============================================================================
 
 import assert from 'node:assert/strict';
-import {
-	computeSummary,
-	pending,
-} from '../../packages/browsecraft-bdd/dist/index.js';
+import { computeSummary, pending } from '../../packages/browsecraft-bdd/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';
@@ -90,14 +87,18 @@ test('computeSummary with empty features', () => {
 test('computeSummary with multiple features', () => {
 	const features = [
 		{
-			name: 'F1', status: 'passed',
+			name: 'F1',
+			status: 'passed',
 			scenarios: [{ name: 'S1', status: 'passed', steps: [], duration: 100, tags: [] }],
-			tags: [], duration: 100,
+			tags: [],
+			duration: 100,
 		},
 		{
-			name: 'F2', status: 'passed',
+			name: 'F2',
+			status: 'passed',
 			scenarios: [{ name: 'S2', status: 'passed', steps: [], duration: 200, tags: [] }],
-			tags: [], duration: 200,
+			tags: [],
+			duration: 200,
 		},
 	];
 	const summary = computeSummary(features);

@@ -7,8 +7,8 @@
 import assert from 'node:assert/strict';
 import {
 	StepRegistry,
-	registerBuiltInSteps,
 	getBuiltInStepPatterns,
+	registerBuiltInSteps,
 } from '../../packages/browsecraft-bdd/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
@@ -325,21 +325,21 @@ test('matches I execute {string}', () => {
 
 test('navigation steps are Given', () => {
 	const patterns = getBuiltInStepPatterns();
-	const nav = patterns.filter(p => p.pattern === 'I am on {string}');
+	const nav = patterns.filter((p) => p.pattern === 'I am on {string}');
 	assert.equal(nav.length, 1);
 	assert.equal(nav[0].type, 'Given');
 });
 
 test('interaction steps are When', () => {
 	const patterns = getBuiltInStepPatterns();
-	const click = patterns.filter(p => p.pattern === 'I click {string}');
+	const click = patterns.filter((p) => p.pattern === 'I click {string}');
 	assert.equal(click.length, 1);
 	assert.equal(click[0].type, 'When');
 });
 
 test('assertion steps are Then', () => {
 	const patterns = getBuiltInStepPatterns();
-	const see = patterns.filter(p => p.pattern === 'I should see {string}');
+	const see = patterns.filter((p) => p.pattern === 'I should see {string}');
 	assert.equal(see.length, 1);
 	assert.equal(see[0].type, 'Then');
 });

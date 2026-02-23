@@ -5,9 +5,7 @@
 // ============================================================================
 
 import assert from 'node:assert/strict';
-import {
-	TestRunner,
-} from '../../packages/browsecraft-runner/dist/index.js';
+import { TestRunner } from '../../packages/browsecraft-runner/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';
@@ -190,8 +188,22 @@ await testAsync('run respects grep filter', async () => {
 
 	await runner.run(
 		async () => [
-			{ title: 'normal test', suitePath: [], skip: false, only: false, options: {}, fn: async () => {} },
-			{ title: 'special test', suitePath: [], skip: false, only: false, options: {}, fn: async () => {} },
+			{
+				title: 'normal test',
+				suitePath: [],
+				skip: false,
+				only: false,
+				options: {},
+				fn: async () => {},
+			},
+			{
+				title: 'special test',
+				suitePath: [],
+				skip: false,
+				only: false,
+				options: {},
+				fn: async () => {},
+			},
 		],
 		async (t) => {
 			executions.push(t.title);
@@ -262,12 +274,25 @@ await testAsync('run handles retries', async () => {
 
 	await runner.run(
 		async () => [
-			{ title: 'flaky test', suitePath: [], skip: false, only: false, options: {}, fn: async () => {} },
+			{
+				title: 'flaky test',
+				suitePath: [],
+				skip: false,
+				only: false,
+				options: {},
+				fn: async () => {},
+			},
 		],
 		async () => {
 			attemptCount++;
 			if (attemptCount < 3) {
-				return { title: 'flaky test', suitePath: [], status: 'failed', duration: 10, error: new Error('flaky') };
+				return {
+					title: 'flaky test',
+					suitePath: [],
+					status: 'failed',
+					duration: 10,
+					error: new Error('flaky'),
+				};
 			}
 			return { title: 'flaky test', suitePath: [], status: 'passed', duration: 10 };
 		},
@@ -294,10 +319,7 @@ await testAsync('run bails after first failure when bail=true', async () => {
 			ai: 'auto',
 			debug: false,
 		},
-		files: [
-			import.meta.url.replace('file:///', ''),
-			import.meta.url.replace('file:///', ''),
-		],
+		files: [import.meta.url.replace('file:///', ''), import.meta.url.replace('file:///', '')],
 		bail: true,
 	});
 
@@ -307,7 +329,13 @@ await testAsync('run bails after first failure when bail=true', async () => {
 		],
 		async () => {
 			executions.push('exec');
-			return { title: 'test', suitePath: [], status: 'failed', duration: 10, error: new Error('fail') };
+			return {
+				title: 'test',
+				suitePath: [],
+				status: 'failed',
+				duration: 10,
+				error: new Error('fail'),
+			};
 		},
 	);
 

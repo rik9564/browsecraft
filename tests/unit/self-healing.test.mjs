@@ -7,15 +7,13 @@
 
 console.log('\n\x1b[1mSelf-Healing Tests\x1b[0m\n');
 console.log('  \x1b[33m⊘ skipped (pending recalibration)\x1b[0m');
-console.log(`\n  Self-Healing: 0 passed, 0 failed (SKIPPED)\n`);
+console.log('\n  Self-Healing: 0 passed, 0 failed (SKIPPED)\n');
 process.exit(0);
 
 /* --- tests disabled below --- */
 
 import assert from 'node:assert/strict';
-import {
-	healSelector,
-} from '../../packages/browsecraft-ai/dist/index.js';
+import { healSelector } from '../../packages/browsecraft-ai/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';
@@ -85,7 +83,13 @@ await testAsync('heals by text similarity', async () => {
 
 await testAsync('heals by class overlap', async () => {
 	const snapshot = makeSnapshot([
-		{ tag: 'button', id: 'action', classes: ['btn', 'primary', 'large'], selector: 'button.btn.primary.large', text: 'Submit' },
+		{
+			tag: 'button',
+			id: 'action',
+			classes: ['btn', 'primary', 'large'],
+			selector: 'button.btn.primary.large',
+			text: 'Submit',
+		},
 		{ tag: 'div', classes: ['container'], selector: 'div.container' },
 	]);
 
@@ -121,12 +125,26 @@ await testAsync('tag matching contributes to score', async () => {
 
 await testAsync('heals by data-testid', async () => {
 	const snapshot = makeSnapshot([
-		{ tag: 'input', testId: 'login-email', id: 'email', selector: '[data-testid="login-email"]', text: 'email input' },
-		{ tag: 'input', testId: 'login-password', id: 'pass', selector: '[data-testid="login-password"]' },
+		{
+			tag: 'input',
+			testId: 'login-email',
+			id: 'email',
+			selector: '[data-testid="login-email"]',
+			text: 'email input',
+		},
+		{
+			tag: 'input',
+			testId: 'login-password',
+			id: 'pass',
+			selector: '[data-testid="login-password"]',
+		},
 	]);
 
 	// "login-mail" is similar to "login-email" (testId similarity ~0.7*0.3=0.21 + more)
-	const result = await healSelector('[data-testid="login-mail"]', snapshot, { useAI: false, minConfidence: 0.15 });
+	const result = await healSelector('[data-testid="login-mail"]', snapshot, {
+		useAI: false,
+		minConfidence: 0.15,
+	});
 	assert.equal(result.healed, true);
 	assert.ok(result.selector.includes('login-email'));
 });
@@ -139,7 +157,13 @@ await testAsync('uses context hint for matching', async () => {
 	const snapshot = makeSnapshot([
 		{ tag: 'button', selector: 'button.foo', text: 'OK' },
 		{ tag: 'button', selector: 'button.bar', text: 'Cancel', ariaLabel: 'Cancel action' },
-		{ tag: 'input', selector: 'input.email', placeholder: 'Enter email', name: 'email', text: 'email' },
+		{
+			tag: 'input',
+			selector: 'input.email',
+			placeholder: 'Enter email',
+			name: 'email',
+			text: 'email',
+		},
 	]);
 
 	// Context matches on name + placeholder + text for the input
@@ -157,9 +181,7 @@ await testAsync('uses context hint for matching', async () => {
 // -----------------------------------------------------------------------
 
 await testAsync('returns healed=false when no match', async () => {
-	const snapshot = makeSnapshot([
-		{ tag: 'div', id: 'unrelated', selector: 'div#unrelated' },
-	]);
+	const snapshot = makeSnapshot([{ tag: 'div', id: 'unrelated', selector: 'div#unrelated' }]);
 
 	const result = await healSelector('#completely-different', snapshot, {
 		useAI: false,
@@ -205,9 +227,7 @@ await testAsync('candidates are sorted by confidence descending', async () => {
 // -----------------------------------------------------------------------
 
 await testAsync('respects minConfidence threshold', async () => {
-	const snapshot = makeSnapshot([
-		{ tag: 'button', id: 'xyz', selector: '#xyz', text: 'A' },
-	]);
+	const snapshot = makeSnapshot([{ tag: 'button', id: 'xyz', selector: '#xyz', text: 'A' }]);
 
 	// Very high threshold — should not match vaguely
 	const result = await healSelector('#abc', snapshot, {
@@ -223,12 +243,21 @@ await testAsync('respects minConfidence threshold', async () => {
 
 await testAsync('heals by name attribute similarity', async () => {
 	const snapshot = makeSnapshot([
-		{ tag: 'input', name: 'username', id: 'user', selector: 'input[name="username"]', text: 'username' },
+		{
+			tag: 'input',
+			name: 'username',
+			id: 'user',
+			selector: 'input[name="username"]',
+			text: 'username',
+		},
 		{ tag: 'input', name: 'password', id: 'pass', selector: 'input[name="password"]' },
 	]);
 
 	// "user-name" is similar to "username" — combine multiple signals
-	const result = await healSelector('[name="user-name"]', snapshot, { useAI: false, minConfidence: 0.15 });
+	const result = await healSelector('[name="user-name"]', snapshot, {
+		useAI: false,
+		minConfidence: 0.15,
+	});
 	assert.equal(result.healed, true);
 	assert.ok(result.selector.includes('username'));
 });

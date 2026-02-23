@@ -4,17 +4,17 @@
 // Run all unit tests
 // ============================================================================
 
-import { readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
+import { readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const files = readdirSync(__dirname)
 	.filter((f) => f.endsWith('.test.mjs'))
 	.sort();
 
-console.log(`\n\x1b[1;36m══ Browsecraft Unit Tests ══\x1b[0m`);
+console.log('\n\x1b[1;36m══ Browsecraft Unit Tests ══\x1b[0m');
 console.log(`Found ${files.length} test files\n`);
 
 let totalFailed = 0;

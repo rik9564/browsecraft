@@ -7,8 +7,8 @@
 import assert from 'node:assert/strict';
 import {
 	BrowsecraftError,
-	ElementNotFoundError,
 	ElementNotActionableError,
+	ElementNotFoundError,
 	NetworkError,
 	TimeoutError,
 } from '../../packages/browsecraft/dist/index.js';

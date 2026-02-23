@@ -6,16 +6,16 @@
 
 import assert from 'node:assert/strict';
 import {
-	feature,
-	scenario,
-	given,
-	when,
-	thenStep,
 	and,
 	but,
-	runFeatures,
 	clearFeatures,
+	feature,
 	getCollectedFeatureCount,
+	given,
+	runFeatures,
+	scenario,
+	thenStep,
+	when,
 } from '../../packages/browsecraft-bdd/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
@@ -64,15 +64,21 @@ test('feature() collects a feature', () => {
 
 test('multiple features collected', () => {
 	clearFeatures();
-	feature('A', () => { scenario('S1', () => {}); });
-	feature('B', () => { scenario('S2', () => {}); });
+	feature('A', () => {
+		scenario('S1', () => {});
+	});
+	feature('B', () => {
+		scenario('S2', () => {});
+	});
 	assert.equal(getCollectedFeatureCount(), 2);
 	clearFeatures();
 });
 
 test('clearFeatures resets count', () => {
 	clearFeatures();
-	feature('X', () => { scenario('Y', () => {}); });
+	feature('X', () => {
+		scenario('Y', () => {});
+	});
 	assert.equal(getCollectedFeatureCount(), 1);
 	clearFeatures();
 	assert.equal(getCollectedFeatureCount(), 0);
@@ -80,10 +86,7 @@ test('clearFeatures resets count', () => {
 
 test('scenario outside feature throws', () => {
 	clearFeatures();
-	assert.throws(
-		() => scenario('orphan', () => {}),
-		/must be called inside a feature/,
-	);
+	assert.throws(() => scenario('orphan', () => {}), /must be called inside a feature/);
 });
 
 test('feature with tags', () => {
@@ -114,9 +117,15 @@ await testAsync('runFeatures runs collected features', async () => {
 
 	feature('Login', () => {
 		scenario('Valid creds', (ctx) => {
-			given('I am on the login page', () => { log.push('given'); });
-			when('I submit', () => { log.push('when'); });
-			thenStep('I see dashboard', () => { log.push('then'); });
+			given('I am on the login page', () => {
+				log.push('given');
+			});
+			when('I submit', () => {
+				log.push('when');
+			});
+			thenStep('I see dashboard', () => {
+				log.push('then');
+			});
 		});
 	});
 
@@ -144,7 +153,9 @@ await testAsync('runFeatures handles step failure', async () => {
 	feature('Failing', () => {
 		scenario('Bad step', (ctx) => {
 			given('setup', () => {});
-			when('something fails', () => { throw new Error('boom'); });
+			when('something fails', () => {
+				throw new Error('boom');
+			});
 			thenStep('never reached', () => {});
 		});
 	});
@@ -181,11 +192,21 @@ await testAsync('runFeatures supports and/but steps', async () => {
 
 	feature('Steps', () => {
 		scenario('Various', (ctx) => {
-			given('setup', () => { log.push('given'); });
-			and('more setup', () => { log.push('and'); });
-			when('action', () => { log.push('when'); });
-			but('exception', () => { log.push('but'); });
-			thenStep('verify', () => { log.push('then'); });
+			given('setup', () => {
+				log.push('given');
+			});
+			and('more setup', () => {
+				log.push('and');
+			});
+			when('action', () => {
+				log.push('when');
+			});
+			but('exception', () => {
+				log.push('but');
+			});
+			thenStep('verify', () => {
+				log.push('then');
+			});
 		});
 	});
 
@@ -210,7 +231,7 @@ await testAsync('runFeatures with async steps', async () => {
 	feature('Async', () => {
 		scenario('Async step', (ctx) => {
 			given('async op', async () => {
-				await new Promise(r => setTimeout(r, 5));
+				await new Promise((r) => setTimeout(r, 5));
 			});
 		});
 	});

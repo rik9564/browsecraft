@@ -5,7 +5,7 @@
 // ============================================================================
 
 import assert from 'node:assert/strict';
-import { parseGherkin, getSupportedLanguages } from '../../packages/browsecraft-bdd/dist/index.js';
+import { getSupportedLanguages, parseGherkin } from '../../packages/browsecraft-bdd/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';
@@ -43,7 +43,7 @@ console.log('\n\x1b[1mGherkin Parser Tests\x1b[0m\n');
 // -----------------------------------------------------------------------
 
 test('parses a minimal Feature', () => {
-	const doc = parseGherkin(`Feature: Login`);
+	const doc = parseGherkin('Feature: Login');
 	assert.ok(doc.feature);
 	assert.equal(doc.feature.keyword, 'Feature');
 	assert.equal(doc.feature.name, 'Login');
@@ -164,7 +164,7 @@ test('parses feature-level tags', () => {
 Feature: Tagged
 `);
 	assert.ok(doc.feature);
-	const tags = doc.feature.tags.map(t => t.name);
+	const tags = doc.feature.tags.map((t) => t.name);
 	assert.ok(tags.includes('@smoke'));
 	assert.ok(tags.includes('@regression'));
 });
@@ -177,7 +177,7 @@ Feature: F
     Given something
 `);
 	const scenario = doc.feature.children[0].scenario;
-	const tags = scenario.tags.map(t => t.name);
+	const tags = scenario.tags.map((t) => t.name);
 	assert.ok(tags.includes('@login'));
 	assert.ok(tags.includes('@critical'));
 });

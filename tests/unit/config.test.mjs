@@ -5,10 +5,7 @@
 // ============================================================================
 
 import assert from 'node:assert/strict';
-import {
-	resolveConfig,
-	defineConfig,
-} from '../../packages/browsecraft/dist/index.js';
+import { defineConfig, resolveConfig } from '../../packages/browsecraft/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';

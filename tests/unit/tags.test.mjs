@@ -6,9 +6,9 @@
 
 import assert from 'node:assert/strict';
 import {
-	parseTagExpression,
 	evaluateTagExpression,
 	matchesTags,
+	parseTagExpression,
 	tagsMatch,
 } from '../../packages/browsecraft-bdd/dist/index.js';
 

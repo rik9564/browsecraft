@@ -6,9 +6,7 @@
 
 import assert from 'node:assert/strict';
 import { deflateSync } from 'node:zlib';
-import {
-	compareScreenshots,
-} from '../../packages/browsecraft-ai/dist/index.js';
+import { compareScreenshots } from '../../packages/browsecraft-ai/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';
@@ -62,8 +60,8 @@ function createPNG(width, height, rgba) {
 	const ihdr = Buffer.alloc(13);
 	ihdr.writeUInt32BE(width, 0);
 	ihdr.writeUInt32BE(height, 4);
-	ihdr[8] = 8;  // bit depth
-	ihdr[9] = 6;  // color type: RGBA
+	ihdr[8] = 8; // bit depth
+	ihdr[9] = 6; // color type: RGBA
 	ihdr[10] = 0; // compression
 	ihdr[11] = 0; // filter
 	ihdr[12] = 0; // interlace
@@ -103,7 +101,7 @@ for (let n = 0; n < 256; n++) {
 function crc32(buf) {
 	let crc = 0xffffffff;
 	for (let i = 0; i < buf.length; i++) {
-		crc = (crcTable[(crc ^ buf[i]) & 0xff]) ^ (crc >>> 8);
+		crc = crcTable[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8);
 	}
 	return (crc ^ 0xffffffff) >>> 0;
 }
@@ -130,7 +128,8 @@ await testAsync('identical images match', async () => {
 // -----------------------------------------------------------------------
 
 await testAsync('completely different images fail', async () => {
-	const w = 2, h = 2;
+	const w = 2;
+	const h = 2;
 	const rgba1 = new Uint8Array(w * h * 4);
 	const rgba2 = new Uint8Array(w * h * 4);
 
@@ -162,7 +161,8 @@ await testAsync('completely different images fail', async () => {
 // -----------------------------------------------------------------------
 
 await testAsync('small differences within threshold still match', async () => {
-	const w = 2, h = 2;
+	const w = 2;
+	const h = 2;
 	const rgba1 = new Uint8Array(w * h * 4);
 	const rgba2 = new Uint8Array(w * h * 4);
 
@@ -188,7 +188,8 @@ await testAsync('small differences within threshold still match', async () => {
 });
 
 await testAsync('differences above threshold detected', async () => {
-	const w = 2, h = 2;
+	const w = 2;
+	const h = 2;
 	const rgba1 = new Uint8Array(w * h * 4);
 	const rgba2 = new Uint8Array(w * h * 4);
 
@@ -215,7 +216,8 @@ await testAsync('differences above threshold detected', async () => {
 // -----------------------------------------------------------------------
 
 await testAsync('respects maxDiffPercent', async () => {
-	const w = 10, h = 10;
+	const w = 10;
+	const h = 10;
 	const rgba1 = new Uint8Array(w * h * 4);
 	const rgba2 = new Uint8Array(w * h * 4);
 
@@ -248,7 +250,8 @@ await testAsync('respects maxDiffPercent', async () => {
 // -----------------------------------------------------------------------
 
 await testAsync('ignores specified regions', async () => {
-	const w = 4, h = 4;
+	const w = 4;
+	const h = 4;
 	const rgba1 = new Uint8Array(w * h * 4);
 	const rgba2 = new Uint8Array(w * h * 4);
 
@@ -296,7 +299,8 @@ await testAsync('different dimensions returns 100% diff', async () => {
 await testAsync('diff output path option exists', async () => {
 	// The encodePNG function internally uses require('node:zlib') which doesn't
 	// work in ESM. Just verify the option is accepted without crashing on decode.
-	const w = 2, h = 2;
+	const w = 2;
+	const h = 2;
 	const rgba1 = new Uint8Array(w * h * 4);
 	const rgba2 = new Uint8Array(w * h * 4);
 
@@ -320,7 +324,8 @@ await testAsync('diff output path option exists', async () => {
 
 await testAsync('anti-aliasing detection does not crash', async () => {
 	// Create two images with a high-contrast edge where anti-aliasing might occur
-	const w = 4, h = 4;
+	const w = 4;
+	const h = 4;
 	const rgba1 = new Uint8Array(w * h * 4);
 	const rgba2 = new Uint8Array(w * h * 4);
 
