@@ -1,6 +1,6 @@
 {
 	"name": "browsecraft-bidi",
-	"version": "0.5.0",
+	"version": "0.5.1",
 	"description": "WebDriver BiDi protocol client for Browsecraft",
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -13,7 +13,10 @@
 			"require": "./dist/index.cjs"
 		}
 	},
-	"files": ["dist", "LICENSE"],
+	"files": [
+		"dist",
+		"LICENSE"
+	],
 	"scripts": {
 		"build": "tsup",
 		"dev": "tsup --watch",

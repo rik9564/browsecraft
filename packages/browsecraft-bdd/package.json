@@ -1,6 +1,6 @@
 {
 	"name": "browsecraft-bdd",
-	"version": "0.5.0",
+	"version": "0.5.1",
 	"description": "Built-in BDD support for Browsecraft — Gherkin parser, step definitions, AI auto-steps, and TypeScript-native BDD mode",
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -13,7 +13,11 @@
 			"require": "./dist/index.cjs"
 		}
 	},
-	"files": ["dist", "glue", "LICENSE"],
+	"files": [
+		"dist",
+		"glue",
+		"LICENSE"
+	],
 	"scripts": {
 		"build": "tsup",
 		"dev": "tsup --watch",

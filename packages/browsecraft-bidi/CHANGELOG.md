@@ -1,5 +1,13 @@
 # browsecraft-bidi
 
+## 0.5.1
+
+### Patch Changes
+
+- feat: add `bdd` as first-class CLI subcommand (`npx browsecraft bdd`)
+  fix: show error details when BDD scenarios fail with 0 steps
+  fix: add `types: [node]` to root tsconfig resolving 160 IDE errors
+
 ## 0.5.0
 
 ### Minor Changes
