@@ -1,6 +1,6 @@
 {
 	"name": "create-browsecraft",
-	"version": "0.4.0",
+	"version": "0.5.0",
 	"description": "Create a new Browsecraft project with zero configuration",
 	"type": "module",
 	"main": "./dist/index.js",

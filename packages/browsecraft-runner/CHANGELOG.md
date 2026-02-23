@@ -1,5 +1,31 @@
 # browsecraft-runner
 
+## 0.5.0
+
+### Minor Changes
+
+- ### New Features
+
+  - **Self-healing selectors** — automatically suggests replacement selectors when CSS selectors break, using AI or heuristic fallback
+  - **Adaptive timing** — auto-adjusts timeouts based on observed action performance
+  - **Failure classification & smart retry** — categorizes failures (network/timeout/element/assertion/script) and only retries those that might succeed
+  - **AI failure diagnosis** — analyzes test failures with page context and suggests fixes
+  - **Persistent AI cache** — caches AI results on disk to avoid redundant API calls
+  - **Confidence gating** — only applies AI suggestions above a configurable threshold
+  - **BDD parallel execution** — distribute scenarios across multi-browser worker pools with `parallel`, `sequential`, and `matrix` strategies
+  - **Scenario filtering** — `--scenario`, `--grep`, `--tag`, and `feature.feature:15` line-number targeting
+  - **`scenarioFilter` callback** — programmatic scenario filtering with `(name, tags, uri?)` signature
+  - **IDE integration** — `npx browsecraft setup-ide` generates VS Code/Cucumber config for zero-config step discovery
+  - **38 built-in BDD steps** — pre-built step definitions for navigation, forms, visibility, URLs, waiting, screenshots, and more
+
+  ### Improvements
+
+  - Eliminated all `noExplicitAny` lint warnings with proper types
+  - Added `BddPage` duck-typed interface for built-in steps (avoids circular dependency)
+  - Added `.gitattributes` to enforce LF line endings across platforms
+  - Fixed all Biome lint errors (CRLF formatting, `useTemplate` violations)
+  - Updated all READMEs with comprehensive documentation for new features
+
 ## 0.4.0
 
 ### Minor Changes
