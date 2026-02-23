@@ -1,0 +1,25 @@
+# Cursor Rules — Browsecraft
+
+# READ THE FULL RULEBOOK: AGENTS.md (root of this repo)
+# This file is a pointer — all rules are documented in AGENTS.md.
+
+# MANDATORY: Before every commit, run:
+#   pnpm build                    (6/6 packages must compile)
+#   pnpm lint                     (0 errors, 0 warnings)
+#   node tests/unit/run-all.mjs   (all suites pass)
+
+# KEY RULES:
+# - No `any` types (use proper types or biome-ignore with justification)
+# - LF line endings only (never CRLF)
+# - Template literals only (no string concatenation)
+# - Root tsconfig.json has "types": ["node"] — do NOT remove
+# - Build before testing (tests import from dist/)
+# - Conventional commits: feat:, fix:, docs:, chore:
+# - NEVER push git tags manually — let CI handle it
+# - Tests go in tests/unit/*.test.mjs
+
+# MONOREPO: 6 packages (browsecraft, browsecraft-ai, browsecraft-bdd,
+#   browsecraft-bidi, browsecraft-runner, create-browsecraft)
+# BUILD: pnpm + Turborepo + tsup (ESM + CJS + DTS)
+# LINT: Biome 1.9+ (tabs, single quotes, semicolons, trailing commas)
+# NODE: >= 20.0.0
