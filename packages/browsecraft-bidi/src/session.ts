@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { type BidiOverCdpConnection, connectBidiOverCdp } from './bidi-over-cdp.js';
+import { sanitize } from './utils.js';
 import {
 	type BrowserName,
 	type LaunchOptions,
@@ -138,7 +139,15 @@ export class BiDiSession {
 		if (options.debug) {
 			transportOptions.onRawMessage = (dir, data) => {
 				const prefix = dir === 'send' ? '>>> SEND' : '<<< RECV';
-				console.log(`${prefix}: ${data.slice(0, 500)}`);
+				let logData = data;
+				try {
+					const parsed = JSON.parse(data);
+					const sanitized = sanitize(parsed);
+					logData = JSON.stringify(sanitized);
+				} catch {
+					// Fallback to raw data if not JSON
+				}
+				console.log(`${prefix}: ${logData.slice(0, 500)}`);
 			};
 		}
 
