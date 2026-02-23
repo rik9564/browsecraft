@@ -161,15 +161,22 @@ export class HookRegistry {
 		const result = hook.fn(context);
 
 		if (result instanceof Promise) {
-			await Promise.race([
-				result,
-				new Promise<never>((_, reject) =>
-					setTimeout(
-						() => reject(new Error(`${hookName} timed out after ${hook.timeout}ms`)),
-						hook.timeout,
-					),
-				),
-			]);
+			let timeoutId: NodeJS.Timeout | undefined;
+			try {
+				await Promise.race([
+					result,
+					new Promise<never>((_, reject) => {
+						timeoutId = setTimeout(
+							() => reject(new Error(`${hookName} timed out after ${hook.timeout}ms`)),
+							hook.timeout,
+						);
+					}),
+				]);
+			} finally {
+				if (timeoutId) {
+					clearTimeout(timeoutId);
+				}
+			}
 		}
 	}
 }
