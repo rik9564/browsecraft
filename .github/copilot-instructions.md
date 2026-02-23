@@ -2,17 +2,18 @@
 
 > **Read [AGENTS.md](../AGENTS.md) first.** It is the primary rulebook for all AI agents working on this repo. This file contains Copilot-specific supplementary instructions.
 
-## Mandatory Pre-Commit Checks
+## Mandatory Pre-Commit AND Pre-Push Checks
 
-Before every commit, you MUST run and verify:
+Before every commit AND before every push, you MUST run and verify:
 
 ```bash
 pnpm build                    # 6/6 packages must compile clean
 pnpm lint                     # 0 errors, 0 warnings
 node tests/unit/run-all.mjs   # All suites pass, 0 failures
+node tests/smoke.mjs          # Smoke tests pass (real browser, headed mode)
 ```
 
-If any of these fail, fix the issue before committing. Never skip this.
+**All four checks are mandatory.** Unit tests alone are NOT sufficient — smoke tests catch browser launch failures, CLI routing bugs, and selector issues that unit tests cannot detect. If any check fails, fix the issue before committing. Never skip this.
 
 ## Project Context
 

@@ -48,6 +48,7 @@ Before writing any code, run these to understand the current state:
 pnpm build          # Must be clean (6/6 packages)
 pnpm lint           # Must show 0 errors, 0 warnings
 node tests/unit/run-all.mjs   # All test suites must pass
+node tests/smoke.mjs          # Smoke tests must pass (requires Chrome)
 ```
 
 If any of these fail **before** your change, fix them first or document the pre-existing failure.
@@ -88,11 +89,23 @@ node tests/unit/run-all.mjs
 - If any test fails, fix the code or the test before proceeding.
 - Tests import from compiled `dist/` — always build before testing.
 
-### Step 4: IDE Type Errors
+### Step 4: Smoke / UI Tests (Headed Mode)
+
+```bash
+node tests/smoke.mjs
+```
+
+- Smoke tests launch a **real browser** (Chrome headed) and run end-to-end scenarios.
+- These catch bugs that unit tests cannot: broken selectors, timing issues, browser launch failures, page navigation problems.
+- **You MUST run smoke tests before pushing.** A green unit test suite is NOT sufficient.
+- If Chrome is unavailable in your environment, document that you could not run this step — but do NOT skip it silently.
+- **Why this is mandatory:** Multiple times, code that passed all unit tests broke in real browser execution (e.g., worldFactory failures, selector mismatches, CLI command routing bugs). These were only caught when a user ran the feature manually.
+
+### Step 5: IDE Type Errors
 
 Check for TypeScript errors in the IDE (or run `pnpm typecheck` if available). There should be **zero TypeScript errors** across all source files.
 
-### Step 5: Review Diff
+### Step 6: Review Diff
 
 ```bash
 git diff --staged
@@ -272,9 +285,11 @@ gh release edit "browsecraft@X.Y.Z" --repo rik9564/browsecraft --latest
 # Unit tests (fast, no browser needed)
 node tests/unit/run-all.mjs
 
-# Smoke tests (requires Chrome)
+# Smoke tests (requires Chrome — MANDATORY before push)
 node tests/smoke.mjs
 ```
+
+**Both test suites must pass before pushing.** Unit tests verify logic in isolation; smoke tests verify real browser behavior. Neither alone is sufficient.
 
 ---
 
@@ -293,14 +308,16 @@ These rules exist because these exact bugs happened:
 | Function argument order mismatch | Runtime errors when refactoring function signatures | Check all call sites when changing function parameters |
 | Missing null/undefined guards | Runtime crashes on optional values | Use optional chaining (`?.`) and nullish coalescing (`??`) |
 | Forgetting to build before testing | Tests import from `dist/` — stale builds mean stale tests | Always `pnpm build` before `node tests/unit/run-all.mjs` |
+| Skipping smoke tests before push | CLI routing bug (`bdd` subcommand missing) shipped to users, browser launch failures went undetected | Always run `node tests/smoke.mjs` before pushing |
+| Pushing without running all tests | Scenarios failed silently with 0 steps — error was hidden until a user hit it | Run the FULL pipeline: build → lint → unit tests → smoke tests |
 
 ---
 
 ## 11. Quick Reference Card
 
 ```bash
-# Full verification (run this before EVERY commit)
-pnpm build && pnpm lint && node tests/unit/run-all.mjs
+# Full verification (run this before EVERY commit AND before EVERY push)
+pnpm build && pnpm lint && node tests/unit/run-all.mjs && node tests/smoke.mjs
 
 # Fix lint issues automatically
 pnpm lint:fix
@@ -323,4 +340,4 @@ pnpm typecheck
 - CI runs `lint`, `build`, `typecheck`, and `test` on every push.
 - Any AI agent that does not follow this rulebook may introduce regressions that break the build, tests, or release pipeline.
 
-**If you are an AI model reading this: You MUST run the full verification pipeline (Section 4) before every commit. No exceptions.**
+**If you are an AI model reading this: You MUST run the full verification pipeline (Section 4) before every commit AND before every push. No exceptions. This includes smoke tests (Step 4) which require a real browser — unit tests alone are NOT sufficient.**
