@@ -89,6 +89,31 @@ console.log(result.aiAnalysis);  // AI explanation (if useAI: true)
 
 Zero external dependencies — uses a built-in PNG decoder/encoder.
 
+### AI Failure Diagnosis
+
+Analyze test failures with page context to get actionable fix suggestions.
+
+```js
+import { diagnoseFailure } from 'browsecraft-ai';
+
+const diagnosis = await diagnoseFailure(error, {
+  url: 'https://example.com',
+  title: 'Login Page',
+  pageSnapshot: '<html>...</html>',
+});
+
+if (diagnosis) {
+  console.log(diagnosis.suggestion);  // "The button is disabled. Wait for form validation."
+  console.log(diagnosis.confidence);  // 0.85
+}
+```
+
+Returns `null` when no AI provider is configured — never throws.
+
+### Persistent AI Cache
+
+AI results are cached on disk to avoid redundant API calls. Cache entries are keyed by input hash and automatically reused across test runs.
+
 ## API Reference
 
 ### Functions
@@ -96,6 +121,7 @@ Zero external dependencies — uses a built-in PNG decoder/encoder.
 | Function | Description |
 |----------|-------------|
 | `healSelector(failedSelector, snapshot, options?)` | Suggest a replacement for a broken CSS selector |
+| `diagnoseFailure(error, context?)` | AI-powered failure analysis with fix suggestions |
 | `generateTest(options)` | Generate test code from natural language |
 | `compareScreenshots(baseline, current, options?)` | Pixel-by-pixel screenshot comparison |
 | `isGitHubModelsAvailable(token?)` | Check if the GitHub Models API is reachable |

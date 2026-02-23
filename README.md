@@ -71,6 +71,10 @@ npx browsecraft test --headed          # Watch the browser
 npx browsecraft test --browser firefox # Use Firefox
 npx browsecraft test --grep "login"    # Filter by name
 npx browsecraft test --bdd             # Run BDD feature files
+npx browsecraft test --bdd --scenario "login"        # Run specific BDD scenario
+npx browsecraft test --bdd features/login.feature:15 # Run scenario at line 15
+npx browsecraft test --bdd --tag "@smoke"             # Filter by tag
+npx browsecraft setup-ide              # Generate IDE config for step discovery
 ```
 
 ## Multi-Browser Parallel Execution
@@ -514,6 +518,36 @@ const executor = new BddExecutor({
 
 Supports `and`, `or`, `not`, and parentheses.
 
+### Scenario Filtering
+
+Run specific scenarios by name, tag, or line number:
+
+```bash
+# By scenario name (substring match)
+npx browsecraft test --bdd --scenario "login"
+
+# By tag expression
+npx browsecraft test --bdd --tag "@smoke and not @wip"
+
+# By line number in a feature file
+npx browsecraft test --bdd features/login.feature:15
+
+# Combine filters (AND logic)
+npx browsecraft test --bdd --scenario "login" --tag "@smoke"
+```
+
+Programmatically, use `grep` and `scenarioFilter` on `BddExecutor`:
+
+```ts
+const executor = new BddExecutor({
+  grep: 'login',            // skip scenarios that don't match
+  scenarioFilter: (name, tags, uri) => {
+    return tags.includes('@smoke'); // custom filter logic
+  },
+  // ...
+});
+```
+
 ### Hooks
 
 ```js
@@ -550,13 +584,94 @@ Everything works without AI. These features enhance the experience when availabl
 | Feature | What it does |
 | --- | --- |
 | Self-healing selectors | When a CSS selector breaks, suggests a replacement using page context |
+| AI failure diagnosis | Analyzes failures with page context and suggests fixes |
 | Test generation | Generates test code from a natural-language description |
 | Visual regression | Compares screenshots pixel-by-pixel, with optional AI semantic analysis |
 | Auto-step generation | Writes BDD step definitions from `.feature` files automatically |
+| Persistent AI cache | Caches AI results on disk to avoid redundant API calls |
+| Confidence gating | Only applies AI suggestions above a configurable confidence threshold |
 
 ```js
-import { healSelector, generateTest, compareScreenshots } from 'browsecraft-ai';
+import { healSelector, generateTest, compareScreenshots, diagnoseFailure } from 'browsecraft-ai';
 ```
+
+### Self-Healing Selectors
+
+When a CSS selector breaks, Browsecraft automatically attempts to find a replacement:
+
+```ts
+// Happens automatically during page.click(), page.fill(), etc.
+// Configure in browsecraft.config.ts:
+export default defineConfig({
+  selfHealing: true,         // enable/disable (default: true)
+  selfHealingConfidence: 0.7, // minimum confidence to auto-apply (0.0-1.0)
+});
+```
+
+### AI Failure Diagnosis
+
+When a test fails, Browsecraft can use AI to analyze the failure and suggest fixes:
+
+```ts
+import { diagnoseFailure } from 'browsecraft-ai';
+
+const diagnosis = await diagnoseFailure(error, {
+  url: 'https://example.com',
+  title: 'My Page',
+  pageSnapshot: '<html>...</html>',
+});
+
+console.log(diagnosis?.suggestion);  // "The selector '.old-class' no longer exists. Try '.new-class'."
+console.log(diagnosis?.confidence);  // 0.85
+```
+
+## Adaptive Timing
+
+Browsecraft automatically adjusts timeouts based on observed performance. Fast operations get shorter timeouts, slow operations get more time — no manual tuning needed.
+
+```ts
+export default defineConfig({
+  adaptiveTiming: true,  // default: true
+  timeout: 30000,        // base timeout (adapted per-action)
+});
+```
+
+The system tracks how long each action type (click, fill, navigation) typically takes and adjusts expectations accordingly.
+
+## Failure Classification & Smart Retry
+
+Not all failures are equal. Browsecraft classifies each failure and only retries the ones that might succeed on a second attempt:
+
+| Category | Retryable | Examples |
+|----------|-----------|----------|
+| Network | Yes | `ECONNRESET`, `ECONNREFUSED`, socket timeouts |
+| Timeout | Yes | Navigation timeouts, page load timeouts |
+| Element | Conditional | Element not found (retryable), element disabled (not retryable) |
+| Assertion | No | `Expected "foo" but got "bar"` |
+| Script | No | `TypeError`, `ReferenceError` in evaluated code |
+
+```ts
+export default defineConfig({
+  retries: 2,           // max retry attempts
+  retryStrategy: 'smart', // 'smart' (default) | 'all' | 'none'
+});
+```
+
+## IDE Integration
+
+Zero-config step definition discovery for VS Code with the Cucumber extension.
+
+```bash
+npx browsecraft setup-ide
+```
+
+This generates:
+
+- `.vscode/settings.json` — Cucumber extension glue path configuration
+- `.vscode/extensions.json` — Recommends the Cucumber extension
+- `glue/steps.js` — 38 built-in step patterns in Cucumber-compatible format
+
+Your `.feature` files get full autocomplete and go-to-definition for all built-in steps, plus any custom steps you define.
 
 ## Examples
 
@@ -584,11 +699,11 @@ Six npm packages, one monorepo:
 
 | Package | Role |
 | --- | --- |
-| `browsecraft` | Main package. Page API, Browser, config, CLI. |
-| `browsecraft-bdd` | Gherkin parser, step registry, executor, hooks, tags, TS-native BDD, 38 built-in steps. |
+| `browsecraft` | Main package. Page API, Browser, config, CLI, adaptive timing, self-healing. |
+| `browsecraft-bdd` | Gherkin parser, step registry, executor, hooks, tags, TS-native BDD, 38 built-in steps, AI auto-steps. |
 | `browsecraft-bidi` | WebDriver BiDi protocol client and browser launcher. |
-| `browsecraft-runner` | Test runner, multi-browser worker pool, parallel scheduler, result aggregator, event bus. |
-| `browsecraft-ai` | Self-healing selectors, test generation, visual diff. |
+| `browsecraft-runner` | Event bus, multi-browser worker pool, parallel scheduler, result aggregator, failure classification, smart retry. |
+| `browsecraft-ai` | Self-healing selectors, AI failure diagnosis, test generation, visual diff, persistent cache. |
 | `create-browsecraft` | Project scaffolding CLI (`npm init browsecraft`). Zero dependencies. |
 
 Most users only need `browsecraft`. Add `browsecraft-bdd` for BDD, `browsecraft-ai` for AI features.

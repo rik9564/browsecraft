@@ -341,12 +341,14 @@ Everything works without AI. These features enhance the experience when availabl
 | Feature | What it does |
 | --- | --- |
 | Self-healing selectors | When a CSS selector breaks, suggests a replacement using page context |
+| AI failure diagnosis | Analyzes failures with page context and suggests fixes |
 | Test generation | Generates test code from a natural-language description |
 | Visual regression | Compares screenshots pixel-by-pixel, with optional AI semantic analysis |
 | Auto-step generation | Writes BDD step definitions from `.feature` files automatically |
+| Persistent AI cache | Caches AI results on disk to avoid redundant API calls |
 
 ```js
-import { healSelector, generateTest, compareScreenshots } from 'browsecraft-ai';
+import { healSelector, generateTest, compareScreenshots, diagnoseFailure } from 'browsecraft-ai';
 ```
 
 ## Examples
@@ -371,15 +373,16 @@ node test.mjs --maximized  # full screen
 
 ## Architecture
 
-Five npm packages, one monorepo:
+Six npm packages, one monorepo:
 
 | Package | Role |
 | --- | --- |
-| `browsecraft` | Main package. Page API, Browser, config, CLI. |
-| `browsecraft-bdd` | Gherkin parser, step registry, executor, hooks, tags, TS-native BDD. |
+| `browsecraft` | Main package. Page API, Browser, config, CLI, adaptive timing, self-healing. |
+| `browsecraft-bdd` | Gherkin parser, step registry, executor, hooks, tags, TS-native BDD, 38 built-in steps, AI auto-steps. |
 | `browsecraft-bidi` | WebDriver BiDi protocol client and browser launcher. |
-| `browsecraft-runner` | Test file discovery, execution, reporter types. |
-| `browsecraft-ai` | Self-healing selectors, test generation, visual diff. |
+| `browsecraft-runner` | Event bus, multi-browser worker pool, parallel scheduler, result aggregator, failure classification, smart retry. |
+| `browsecraft-ai` | Self-healing selectors, AI failure diagnosis, test generation, visual diff, persistent cache. |
+| `create-browsecraft` | Project scaffolding CLI (`npm init browsecraft`). Zero dependencies. |
 
 Most users only need `browsecraft`. Add `browsecraft-bdd` for BDD, `browsecraft-ai` for AI features.
 
