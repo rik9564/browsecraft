@@ -20,7 +20,16 @@ import { Browser } from './browser.js';
 import { type BddAIStepsMode, type UserConfig, resolveAIConfig, resolveConfig } from './config.js';
 import { type TestCase, runAfterAllHooks, runTest, testRegistry } from './test.js';
 
-const VERSION = '0.3.0';
+// Read version dynamically so it stays in sync with package.json
+const VERSION: string = (() => {
+	try {
+		const pkgPath = new URL('../package.json', import.meta.url);
+		const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string };
+		return pkg.version;
+	} catch {
+		return '0.0.0';
+	}
+})();
 
 async function main() {
 	const args = process.argv.slice(2);
@@ -71,8 +80,7 @@ async function main() {
 
 async function runTests(args: string[]) {
 	// Parse CLI flags
-	const flags = parseFlags(args);
-	const filePatterns = args.filter((a) => !a.startsWith('--'));
+	const { flags, positional: filePatterns } = parseFlags(args);
 
 	// Load config file if it exists
 	const userConfig = await loadConfig();
@@ -1052,8 +1060,9 @@ function normalizeBddAiStepsMode(
 	}
 }
 
-function parseFlags(args: string[]): CLIFlags {
+function parseFlags(args: string[]): { flags: CLIFlags; positional: string[] } {
 	const flags: CLIFlags = {};
+	const positional: string[] = [];
 
 	for (let i = 0; i < args.length; i++) {
 		const arg = args[i]!;
@@ -1104,10 +1113,16 @@ function parseFlags(args: string[]): CLIFlags {
 				flags.aiSteps = raw;
 				break;
 			}
+			default:
+				// Not a known flag — treat as a positional argument (file path)
+				if (!arg.startsWith('--') && !arg.startsWith('-')) {
+					positional.push(arg);
+				}
+				break;
 		}
 	}
 
-	return flags;
+	return { flags, positional };
 }
 
 // ---------------------------------------------------------------------------
