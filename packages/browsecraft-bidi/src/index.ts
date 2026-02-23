@@ -12,4 +12,5 @@ export {
 	type LaunchResult,
 } from './launcher.js';
 export { connectBidiOverCdp, type BidiOverCdpConnection } from './bidi-over-cdp.js';
+export { sanitize } from './utils.js';
 export * from './types.js';
