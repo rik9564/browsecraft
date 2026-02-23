@@ -1,5 +1,16 @@
 # browsecraft
 
+## 0.6.1
+
+### Patch Changes
+
+- Fix AI step execution: add case-insensitive accessible name fallback in locator and improve AI prompt for case sensitivity and page navigation patterns
+
+- Updated dependencies []:
+  - browsecraft-bdd@0.6.1
+  - browsecraft-bidi@0.6.1
+  - browsecraft-runner@0.6.1
+
 ## 0.6.0
 
 ### Minor Changes
