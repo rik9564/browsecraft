@@ -5,6 +5,8 @@
 /** Configuration shape (mirrors browsecraft's BrowsecraftConfig) */
 export interface BrowsecraftConfig {
 	browser: 'chrome' | 'firefox' | 'edge';
+	/** Run across multiple browsers simultaneously */
+	browsers?: Array<'chrome' | 'firefox' | 'edge'>;
 	headless: boolean;
 	timeout: number;
 	retries: number;
@@ -14,7 +16,10 @@ export interface BrowsecraftConfig {
 	viewport: { width: number; height: number };
 	/** Start the browser window maximized (headed mode only, default: false) */
 	maximized: boolean;
+	/** Workers per browser */
 	workers: number;
+	/** Execution strategy: 'parallel' | 'sequential' | 'matrix' */
+	strategy: 'parallel' | 'sequential' | 'matrix';
 	testMatch: string;
 	outputDir: string;
 	ai: 'auto' | 'off' | { provider: 'github-models'; model?: string; token?: string };

@@ -6,10 +6,26 @@
 import { cpus } from 'node:os';
 import type { BrowserName } from 'browsecraft-bidi';
 
+/** Execution strategy for multi-browser runs */
+export type ExecutionStrategy = 'parallel' | 'sequential' | 'matrix';
+
 /** Full configuration with all options */
 export interface BrowsecraftConfig {
 	/** Which browser to use (default: 'chrome') */
 	browser: BrowserName;
+	/**
+	 * Run tests across multiple browsers simultaneously.
+	 * Overrides `browser` when set.
+	 *
+	 * ```ts
+	 * defineConfig({
+	 *   browsers: ['chrome', 'firefox', 'edge'],
+	 *   workers: 2,           // 2 instances per browser = 6 total
+	 *   strategy: 'matrix',   // every scenario on every browser
+	 * });
+	 * ```
+	 */
+	browsers?: BrowserName[];
 	/** Run in headless mode (default: true) */
 	headless: boolean;
 	/** Global timeout for actions in ms (default: 30000) */
@@ -26,8 +42,22 @@ export interface BrowsecraftConfig {
 	viewport: { width: number; height: number };
 	/** Start the browser window maximized (headed mode only, default: false) */
 	maximized: boolean;
-	/** Number of parallel workers (default: CPU cores / 2) */
+	/**
+	 * Number of parallel workers per browser (default: CPU cores / 2).
+	 * When using `browsers: ['chrome', 'firefox']` with `workers: 3`,
+	 * you get 3 Chrome + 3 Firefox = 6 total worker instances.
+	 */
 	workers: number;
+	/**
+	 * Execution strategy for multi-browser runs (default: 'matrix').
+	 *
+	 * - `'parallel'`:   All workers share one queue. Fastest, but a scenario
+	 *                   may only run on one browser.
+	 * - `'sequential'`: One browser at a time. Each gets all scenarios.
+	 * - `'matrix'`:     Every scenario on every browser. Full cross-browser
+	 *                   coverage. Total runs = scenarios × browsers.
+	 */
+	strategy: ExecutionStrategy;
 	/** Test file pattern (default: '**\/*.test.{ts,js,mts,mjs}') */
 	testMatch: string;
 	/** Output directory for reports/screenshots (default: '.browsecraft') */
@@ -72,6 +102,7 @@ const DEFAULTS: BrowsecraftConfig = {
 	viewport: { width: 1280, height: 720 },
 	maximized: false,
 	workers: Math.max(1, Math.floor((typeof cpus === 'function' ? cpus().length : 4) / 2)),
+	strategy: 'matrix',
 	testMatch: '**/*.test.{ts,js,mts,mjs}',
 	outputDir: '.browsecraft',
 	ai: 'auto',

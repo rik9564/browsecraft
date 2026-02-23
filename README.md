@@ -73,6 +73,104 @@ npx browsecraft test --grep "login"    # Filter by name
 npx browsecraft test --bdd             # Run BDD feature files
 ```
 
+## Multi-Browser Parallel Execution
+
+**No other BDD framework offers scenario-level distribution across multi-browser worker pools.** Browsecraft ships a first-class execution engine that runs individual scenarios — not files — across Chrome, Firefox, and Edge simultaneously.
+
+### Three execution strategies
+
+| Strategy | How it works | Best for |
+|----------|-------------|----------|
+| `parallel` | All browser pools run at once; scenarios distributed across all workers | Speed — when tests are browser-independent |
+| `sequential` | One browser at a time; each gets the full scenario set | Isolated runs or limited resources |
+| `matrix` | Every scenario × every browser (full cross-browser coverage) | QA sign-off — guarantees every scenario runs on every browser |
+
+### Configuration
+
+```ts
+// browsecraft.config.ts
+import { defineConfig } from 'browsecraft';
+
+export default defineConfig({
+  browsers: ['chrome', 'firefox', 'edge'],
+  strategy: 'matrix',   // 'parallel' | 'sequential' | 'matrix'
+  workers: 4,            // total worker instances
+});
+```
+
+### Programmatic API
+
+```ts
+import { EventBus, WorkerPool, Scheduler, ResultAggregator } from 'browsecraft-runner';
+
+const bus = new EventBus();
+const pool = new WorkerPool(bus, {
+  browsers: { chrome: 2, firefox: 1, edge: 1 },
+  maxRetries: 1,
+  bail: false,
+});
+
+// Spawn browser instances
+await pool.spawn(async (worker) => {
+  const session = await launchBrowser(worker.browser);
+  return { close: () => session.close() };
+});
+
+// Schedule execution
+const scheduler = new Scheduler(bus, pool, { strategy: 'matrix' });
+const result = await scheduler.run(scenarios, executor);
+
+// Aggregate & display results
+const aggregator = new ResultAggregator();
+const summary = aggregator.aggregate(result);
+
+console.log(aggregator.formatMatrix(summary));
+console.log(aggregator.formatSummary(summary));
+
+await pool.terminate();
+```
+
+### Result matrix
+
+The result aggregator produces a scenario × browser matrix with rich analytics:
+
+```
+  Scenario                                 chrome     firefox    edge
+  ──────────────────────────────────────── ────────── ────────── ──────────
+  User can log in                          ✓ 120ms    ✓ 145ms    ✓ 130ms
+  Add item to cart                         ✓ 80ms     ✗ 92ms     ✓ 85ms    ⚠️
+  Checkout with saved address              ✓ 200ms    ✓ 210ms    ✓ 195ms   🔄
+
+  Legend: ✓ passed  ✗ failed  - skipped  🔄 flaky  ⚠️  inconsistent
+```
+
+### Built-in analytics
+
+- **Flaky test detection** — tests that passed only after retries get flagged
+- **Cross-browser inconsistency** — scenarios that pass on one browser but fail on another
+- **Timing statistics** — min, max, avg, median, and p95 per scenario
+- **Work-stealing scheduling** — workers pull items from a shared queue for optimal load balancing
+
+### Event-driven architecture
+
+The `EventBus` decouples execution from reporting. Subscribe to any lifecycle event:
+
+```ts
+bus.on('item:pass', ({ item, worker, duration }) => {
+  console.log(`✓ ${item.title} on ${worker.browser} (${duration}ms)`);
+});
+
+bus.on('item:fail', ({ item, error }) => {
+  console.log(`✗ ${item.title}: ${error.message}`);
+});
+
+bus.on('progress', ({ completed, total }) => {
+  console.log(`${completed}/${total}`);
+});
+```
+
+Events include `run:start/end`, `worker:spawn/ready/busy/idle/error/terminate`, `item:enqueue/start/pass/fail/skip/retry/end`, `browser:start/end`, and `progress`. This makes it trivial to build custom reporters, CI integrations, or a future UI test runner.
+
 ## API
 
 ### Launch a browser
@@ -489,7 +587,7 @@ Six npm packages, one monorepo:
 | `browsecraft` | Main package. Page API, Browser, config, CLI. |
 | `browsecraft-bdd` | Gherkin parser, step registry, executor, hooks, tags, TS-native BDD, 38 built-in steps. |
 | `browsecraft-bidi` | WebDriver BiDi protocol client and browser launcher. |
-| `browsecraft-runner` | Test file discovery, execution, reporter types. |
+| `browsecraft-runner` | Test runner, multi-browser worker pool, parallel scheduler, result aggregator, event bus. |
 | `browsecraft-ai` | Self-healing selectors, test generation, visual diff. |
 | `create-browsecraft` | Project scaffolding CLI (`npm init browsecraft`). Zero dependencies. |
 
