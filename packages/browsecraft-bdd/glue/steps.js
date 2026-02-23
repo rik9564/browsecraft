@@ -241,7 +241,7 @@ When('I wait for {string} to disappear', async function (target) {
 });
 
 /** Wait for a number of seconds. Example: When I wait 3 seconds */
-When('I wait {int} seconds', async function (seconds) {
+When('I wait {int} seconds', async (seconds) => {
 	await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 });
 

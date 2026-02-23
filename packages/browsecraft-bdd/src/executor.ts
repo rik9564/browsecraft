@@ -215,7 +215,9 @@ export class BddExecutor {
 	private readonly options: ExecutorOptions;
 	private readonly tagFilter: TagExpression | null;
 	private readonly grepPattern: string | null;
-	private readonly scenarioFilter: ((scenario: Scenario, tags: string[], uri?: string) => boolean) | null;
+	private readonly scenarioFilter:
+		| ((scenario: Scenario, tags: string[], uri?: string) => boolean)
+		| null;
 	private readonly aiExecutor: AIStepExecutor | null;
 
 	constructor(options: ExecutorOptions = {}) {

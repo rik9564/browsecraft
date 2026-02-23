@@ -238,9 +238,7 @@ export class Browser {
 			const tree = await this.session.browsingContext.getTree();
 			const contexts = tree.contexts ?? [];
 			for (const ctx of contexts) {
-				const alreadyTracked = this.pages.some(
-					(p) => (p as any).contextId === ctx.context,
-				);
+				const alreadyTracked = this.pages.some((p) => (p as any).contextId === ctx.context);
 				if (!alreadyTracked && ctx.url === 'about:blank') {
 					await this.session.browsingContext.close({ context: ctx.context }).catch(() => {});
 				}

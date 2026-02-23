@@ -349,7 +349,7 @@ test('assertion steps are Then', () => {
 // -----------------------------------------------------------------------
 
 import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -396,11 +396,7 @@ test('glue file has correct step types (Given for nav, When for action, Then for
 			errors.push(`${pattern}: expected ${type}, got ${match[1]}`);
 		}
 	}
-	assert.equal(
-		errors.length,
-		0,
-		`Glue file has wrong step types:\n    ${errors.join('\n    ')}`,
-	);
+	assert.equal(errors.length, 0, `Glue file has wrong step types:\n    ${errors.join('\n    ')}`);
 });
 
 test('glue file does not import from browsecraft (it is standalone)', () => {

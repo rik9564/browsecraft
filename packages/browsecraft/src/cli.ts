@@ -191,7 +191,7 @@ async function runBddTests(
 	// Browsers: --browser chrome,firefox  or  config.browsers  or  [config.browser]
 	const browserNames: string[] = flags?.browser
 		? flags.browser.split(',').map((b) => b.trim())
-		: config.browsers ?? [config.browser];
+		: (config.browsers ?? [config.browser]);
 
 	// Workers per browser (for parallel feature execution)
 	const workers = flags?.workers ?? (browserNames.length > 1 ? 1 : 1);
@@ -324,7 +324,9 @@ async function runBddTests(
 	}
 
 	// ── Step 5: Execute ────────────────────────────────────────────────
-	type FeatureResultType = Awaited<ReturnType<InstanceType<typeof BddExecutor>['run']>>['features'][number];
+	type FeatureResultType = Awaited<
+		ReturnType<InstanceType<typeof BddExecutor>['run']>
+	>['features'][number];
 
 	/**
 	 * Run a set of documents on a specific browser.
@@ -437,11 +439,7 @@ async function runBddTests(
 			// Sequential: one browser at a time, each runs all features
 			for (const bName of browserNames) {
 				const prefix = `\x1b[36m[${bName}]\x1b[0m `;
-				const { features, duration, browser } = await runOnBrowser(
-					bName,
-					documents,
-					prefix,
-				);
+				const { features, duration, browser } = await runOnBrowser(bName, documents, prefix);
 				browsers.push(browser);
 				allFeatures.push(...features);
 				totalDuration += duration;
@@ -733,18 +731,10 @@ async function setupIde() {
 	// Write or merge settings.json
 	const settingsPath = join(vscodeDir, 'settings.json');
 	const cucumberSettings: Record<string, unknown> = {
-		'cucumberautocomplete.steps': [
-			`${stepsDir}/**/*.ts`,
-			`${stepsDir}/**/*.js`,
-			gluePath,
-		],
+		'cucumberautocomplete.steps': [`${stepsDir}/**/*.ts`, `${stepsDir}/**/*.js`, gluePath],
 		'cucumberautocomplete.strictGherkinCompletion': true,
 		'cucumberautocomplete.strictGherkinValidation': true,
-		'cucumber.glue': [
-			`${stepsDir}/**/*.ts`,
-			`${stepsDir}/**/*.js`,
-			gluePath,
-		],
+		'cucumber.glue': [`${stepsDir}/**/*.ts`, `${stepsDir}/**/*.js`, gluePath],
 		'cucumber.features': [`${featuresDir}/**/*.feature`],
 	};
 
@@ -759,17 +749,19 @@ async function setupIde() {
 				}
 			}
 			if (updated) {
-				writeFileSync(settingsPath, JSON.stringify(existing, null, 2) + '\n', 'utf-8');
+				writeFileSync(settingsPath, `${JSON.stringify(existing, null, 2)}\n`, 'utf-8');
 				console.log('  \x1b[32mupdate\x1b[0m  .vscode/settings.json');
 			} else {
-				console.log('  \x1b[33mskip\x1b[0m    .vscode/settings.json \x1b[2m(already configured)\x1b[0m');
+				console.log(
+					'  \x1b[33mskip\x1b[0m    .vscode/settings.json \x1b[2m(already configured)\x1b[0m',
+				);
 			}
 		} catch {
-			writeFileSync(settingsPath, JSON.stringify(cucumberSettings, null, 2) + '\n', 'utf-8');
+			writeFileSync(settingsPath, `${JSON.stringify(cucumberSettings, null, 2)}\n`, 'utf-8');
 			console.log('  \x1b[32mcreate\x1b[0m  .vscode/settings.json');
 		}
 	} else {
-		writeFileSync(settingsPath, JSON.stringify(cucumberSettings, null, 2) + '\n', 'utf-8');
+		writeFileSync(settingsPath, `${JSON.stringify(cucumberSettings, null, 2)}\n`, 'utf-8');
 		console.log('  \x1b[32mcreate\x1b[0m  .vscode/settings.json');
 	}
 
@@ -793,15 +785,17 @@ async function setupIde() {
 			}
 			if (updated) {
 				existing.recommendations = recs;
-				writeFileSync(extensionsPath, JSON.stringify(existing, null, 2) + '\n', 'utf-8');
+				writeFileSync(extensionsPath, `${JSON.stringify(existing, null, 2)}\n`, 'utf-8');
 				console.log('  \x1b[32mupdate\x1b[0m  .vscode/extensions.json');
 			} else {
-				console.log('  \x1b[33mskip\x1b[0m    .vscode/extensions.json \x1b[2m(already configured)\x1b[0m');
+				console.log(
+					'  \x1b[33mskip\x1b[0m    .vscode/extensions.json \x1b[2m(already configured)\x1b[0m',
+				);
 			}
 		} catch {
 			writeFileSync(
 				extensionsPath,
-				JSON.stringify({ recommendations: recommendedExtensions }, null, 2) + '\n',
+				`${JSON.stringify({ recommendations: recommendedExtensions }, null, 2)}\n`,
 				'utf-8',
 			);
 			console.log('  \x1b[32mcreate\x1b[0m  .vscode/extensions.json');
@@ -809,7 +803,7 @@ async function setupIde() {
 	} else {
 		writeFileSync(
 			extensionsPath,
-			JSON.stringify({ recommendations: recommendedExtensions }, null, 2) + '\n',
+			`${JSON.stringify({ recommendations: recommendedExtensions }, null, 2)}\n`,
 			'utf-8',
 		);
 		console.log('  \x1b[32mcreate\x1b[0m  .vscode/extensions.json');
@@ -818,7 +812,7 @@ async function setupIde() {
 	console.log('\n  \x1b[32mDone!\x1b[0m IDE configured for Cucumber/Gherkin support.\n');
 	console.log('  What was set up:');
 	console.log('    \x1b[36m•\x1b[0m Cucumber extension discovers your custom steps');
-	console.log('    \x1b[36m•\x1b[0m Cucumber extension discovers BrowseCraft\'s 38 built-in steps');
+	console.log("    \x1b[36m•\x1b[0m Cucumber extension discovers BrowseCraft's 38 built-in steps");
 	console.log('    \x1b[36m•\x1b[0m Ctrl+Click navigation from .feature files to step definitions');
 	console.log('    \x1b[36m•\x1b[0m Autocomplete suggestions when writing features');
 	console.log('    \x1b[36m•\x1b[0m Recommended Cucumber extensions for VS Code');

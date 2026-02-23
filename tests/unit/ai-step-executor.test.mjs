@@ -135,8 +135,8 @@ await testAsync('returns handled=false when AI is unavailable', async () => {
 	assert.ok(result.error);
 	assert.ok(
 		result.error.message.includes('unavailable') ||
-		result.error.message.includes('GITHUB_TOKEN') ||
-		result.error.message.includes('env var'),
+			result.error.message.includes('GITHUB_TOKEN') ||
+			result.error.message.includes('env var'),
 	);
 });
 
@@ -264,11 +264,14 @@ await testAsync('registered steps take priority over AI', async () => {
 		stepRan = true;
 	});
 
-	const doc = parseGherkin(`
+	const doc = parseGherkin(
+		`
 Feature: Priority test
   Scenario: Registered step wins
     Given I am ready
-`, 'priority.feature');
+`,
+		'priority.feature',
+	);
 
 	const aiExecutor = createAIStepExecutor({ enabled: false });
 	const executor = new BddExecutor({
@@ -282,11 +285,14 @@ Feature: Priority test
 });
 
 await testAsync('undefined step with disabled AI falls through to undefined', async () => {
-	const doc = parseGherkin(`
+	const doc = parseGherkin(
+		`
 Feature: Fallthrough test
   Scenario: No step def and no AI
     Given something that has no definition
-`, 'fallthrough.feature');
+`,
+		'fallthrough.feature',
+	);
 
 	const aiExecutor = createAIStepExecutor({ enabled: false });
 	const executor = new BddExecutor({
@@ -305,11 +311,14 @@ Feature: Fallthrough test
 console.log('\n  \x1b[2mworldFactory crash handling\x1b[0m');
 
 await testAsync('handles synchronous worldFactory throw', async () => {
-	const doc = parseGherkin(`
+	const doc = parseGherkin(
+		`
 Feature: Crash test
   Scenario: World factory fails
     Given something
-`, 'crash.feature');
+`,
+		'crash.feature',
+	);
 
 	const executor = new BddExecutor({
 		registry: new StepRegistry(),
@@ -326,11 +335,14 @@ Feature: Crash test
 });
 
 await testAsync('handles async worldFactory rejection', async () => {
-	const doc = parseGherkin(`
+	const doc = parseGherkin(
+		`
 Feature: Async crash
   Scenario: Async world factory fails
     Given something
-`, 'async-crash.feature');
+`,
+		'async-crash.feature',
+	);
 
 	const executor = new BddExecutor({
 		registry: new StepRegistry(),
@@ -344,14 +356,17 @@ Feature: Async crash
 });
 
 await testAsync('worldFactory error does not crash the entire run', async () => {
-	const doc = parseGherkin(`
+	const doc = parseGherkin(
+		`
 Feature: Multi scenario crash
   Scenario: First scenario - factory crash
     Given step one
 
   Scenario: Second scenario - also crashes
     Given step two
-`, 'multi-crash.feature');
+`,
+		'multi-crash.feature',
+	);
 
 	const executor = new BddExecutor({
 		registry: new StepRegistry(),
@@ -377,11 +392,14 @@ await testAsync('fast step passes and clears its timeout', async () => {
 		// Instant
 	});
 
-	const doc = parseGherkin(`
+	const doc = parseGherkin(
+		`
 Feature: Timeout test
   Scenario: Fast step
     Given a fast step
-`, 'timeout.feature');
+`,
+		'timeout.feature',
+	);
 
 	const executor = new BddExecutor({
 		registry,
@@ -398,11 +416,14 @@ await testAsync('slow step fails when exceeding timeout', async () => {
 		await new Promise((r) => setTimeout(r, 5000));
 	});
 
-	const doc = parseGherkin(`
+	const doc = parseGherkin(
+		`
 Feature: Timeout test
   Scenario: Slow step
     Given a slow step
-`, 'slow-timeout.feature');
+`,
+		'slow-timeout.feature',
+	);
 
 	const executor = new BddExecutor({
 		registry,
@@ -423,13 +444,16 @@ await testAsync('multiple sequential steps each clear their timeouts', async () 
 		await new Promise((r) => setTimeout(r, 10));
 	});
 
-	const doc = parseGherkin(`
+	const doc = parseGherkin(
+		`
 Feature: Multi-step timeout
   Scenario: Three fast steps
     Given step number 1
     When step number 2
     Then step number 3
-`, 'multi-timeout.feature');
+`,
+		'multi-timeout.feature',
+	);
 
 	const executor = new BddExecutor({
 		registry,
@@ -497,7 +521,10 @@ await testAsync('locked mode returns error for uncached step', async () => {
 	assert.equal(result.handled, false);
 	assert.ok(result.error);
 	assert.ok(result.error.message.includes('locked mode'));
-	assert.ok(result.error.message.includes('no cached plan') || result.error.message.includes('No cached plan'));
+	assert.ok(
+		result.error.message.includes('no cached plan') ||
+			result.error.message.includes('No cached plan'),
+	);
 });
 
 test('full config with all new options', () => {

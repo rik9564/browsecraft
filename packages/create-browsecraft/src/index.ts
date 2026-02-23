@@ -344,10 +344,7 @@ function vscodeSettingsTemplate(): string {
 function vscodeExtensionsTemplate(): string {
 	return JSON.stringify(
 		{
-			recommendations: [
-				'alexkrechik.cucumberautocomplete',
-				'CucumberOpen.cucumber-official',
-			],
+			recommendations: ['alexkrechik.cucumberautocomplete', 'CucumberOpen.cucumber-official'],
 		},
 		null,
 		2,
@@ -525,10 +522,7 @@ function setupIdeConfig(targetDir: string) {
 		try {
 			const existing = JSON.parse(readFileSync(extensionsPath, 'utf-8'));
 			const recs: string[] = existing.recommendations ?? [];
-			const toAdd = [
-				'alexkrechik.cucumberautocomplete',
-				'CucumberOpen.cucumber-official',
-			];
+			const toAdd = ['alexkrechik.cucumberautocomplete', 'CucumberOpen.cucumber-official'];
 			let updated = false;
 			for (const ext of toAdd) {
 				if (!recs.includes(ext)) {

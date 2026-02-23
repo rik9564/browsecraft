@@ -129,7 +129,9 @@ function buildPrompt(ctx: DiagnosisContext): string {
 				return attrs.join(' ');
 			})
 			.join('\n');
-		parts.push(`\n## Page Elements (${ctx.snapshot.length} total, showing ${elements.length})\n${summary}`);
+		parts.push(
+			`\n## Page Elements (${ctx.snapshot.length} total, showing ${elements.length})\n${summary}`,
+		);
 	}
 
 	return parts.join('\n');
@@ -147,19 +149,15 @@ function parseResponse(response: string): Diagnosis | null {
 
 		const parsed = JSON.parse(jsonMatch[0]);
 
-		if (
-			typeof parsed.rootCause !== 'string' ||
-			typeof parsed.suggestion !== 'string'
-		) {
+		if (typeof parsed.rootCause !== 'string' || typeof parsed.suggestion !== 'string') {
 			return null;
 		}
 
 		return {
 			rootCause: parsed.rootCause.slice(0, 200), // cap length
 			suggestion: parsed.suggestion.slice(0, 300),
-			confidence: typeof parsed.confidence === 'number'
-				? Math.max(0, Math.min(1, parsed.confidence))
-				: 0.5,
+			confidence:
+				typeof parsed.confidence === 'number' ? Math.max(0, Math.min(1, parsed.confidence)) : 0.5,
 			likelySource: ['test', 'app', 'environment', 'unknown'].includes(parsed.likelySource)
 				? parsed.likelySource
 				: 'unknown',

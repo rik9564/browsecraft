@@ -689,8 +689,24 @@ test('computeSummary merges results from parallel executors', () => {
 				name: 'Valid login',
 				status: 'passed',
 				steps: [
-					{ text: 'go to /login', keyword: 'Given ', status: 'passed', duration: 10, line: 1, attachments: [], logs: [] },
-					{ text: 'type user', keyword: 'When ', status: 'passed', duration: 5, line: 2, attachments: [], logs: [] },
+					{
+						text: 'go to /login',
+						keyword: 'Given ',
+						status: 'passed',
+						duration: 10,
+						line: 1,
+						attachments: [],
+						logs: [],
+					},
+					{
+						text: 'type user',
+						keyword: 'When ',
+						status: 'passed',
+						duration: 5,
+						line: 2,
+						attachments: [],
+						logs: [],
+					},
 				],
 				duration: 15,
 				tags: [],
@@ -708,7 +724,16 @@ test('computeSummary merges results from parallel executors', () => {
 				name: 'Add to cart',
 				status: 'failed',
 				steps: [
-					{ text: 'click buy', keyword: 'When ', status: 'failed', duration: 20, line: 5, attachments: [], logs: [], error: new Error('not found') },
+					{
+						text: 'click buy',
+						keyword: 'When ',
+						status: 'failed',
+						duration: 20,
+						line: 5,
+						attachments: [],
+						logs: [],
+						error: new Error('not found'),
+					},
 				],
 				duration: 20,
 				tags: [],
@@ -810,7 +835,13 @@ await testAsync('executor handles split document sets correctly', async () => {
 	registry.register('Given', /^step two$/, async () => {});
 
 	const hooks = new HookRegistry();
-	const worldFactory = () => ({ page: null, browser: null, ctx: {}, attach: () => {}, log: () => {} });
+	const worldFactory = () => ({
+		page: null,
+		browser: null,
+		ctx: {},
+		attach: () => {},
+		log: () => {},
+	});
 
 	const doc1 = parseGherkin(
 		`Feature: First
@@ -872,8 +903,8 @@ await testAsync('executor grep filter runs only matching scenarios', async () =>
 
 	const result = await executor.run([doc]);
 	assert.equal(result.summary.scenarios.total, 3);
-	assert.equal(result.summary.scenarios.passed, 2);   // Valid login + Valid checkout
-	assert.equal(result.summary.scenarios.skipped, 1);   // Invalid login
+	assert.equal(result.summary.scenarios.passed, 2); // Valid login + Valid checkout
+	assert.equal(result.summary.scenarios.skipped, 1); // Invalid login
 });
 
 // -----------------------------------------------------------------------
@@ -973,7 +1004,7 @@ await testAsync('grep and tagFilter can combine', async () => {
 
 	const result = await executor.run([doc]);
 	assert.equal(result.summary.scenarios.total, 3);
-	assert.equal(result.summary.scenarios.passed, 1);   // @api + "Create" = only "Create user"
+	assert.equal(result.summary.scenarios.passed, 1); // @api + "Create" = only "Create user"
 	assert.equal(result.summary.scenarios.skipped, 2);
 });
 

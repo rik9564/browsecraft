@@ -1508,12 +1508,9 @@ export class Page {
 					provider: aiConfig
 						? {
 								provider: aiConfig.provider,
-								token:
-									'token' in aiConfig ? (aiConfig as { token?: string }).token : undefined,
+								token: 'token' in aiConfig ? (aiConfig as { token?: string }).token : undefined,
 								baseUrl:
-									'baseUrl' in aiConfig
-										? (aiConfig as { baseUrl?: string }).baseUrl
-										: undefined,
+									'baseUrl' in aiConfig ? (aiConfig as { baseUrl?: string }).baseUrl : undefined,
 							}
 						: undefined,
 				});
@@ -1615,8 +1612,9 @@ export class Page {
 			const arr = result.result.value as unknown[];
 			elements = arr
 				.map((item) => this.deserializeRemoteValue(item))
-				.filter((e): e is { tag: string; selector: string; [key: string]: unknown } =>
-					e !== null && typeof e === 'object' && 'tag' in e && 'selector' in e,
+				.filter(
+					(e): e is { tag: string; selector: string; [key: string]: unknown } =>
+						e !== null && typeof e === 'object' && 'tag' in e && 'selector' in e,
 				);
 		}
 
@@ -1632,7 +1630,7 @@ export class Page {
 			// If it looks like a CSS selector (starts with # . [ or contains :)
 			return target.match(/^[#.\[]/) || target.includes(':') ? target : null;
 		}
-		return target.selector ?? target.testId ? `[data-testid="${target.testId}"]` : null;
+		return (target.selector ?? target.testId) ? `[data-testid="${target.testId}"]` : null;
 	}
 
 	/**

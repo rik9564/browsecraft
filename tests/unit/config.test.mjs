@@ -5,7 +5,11 @@
 // ============================================================================
 
 import assert from 'node:assert/strict';
-import { defineConfig, resolveConfig, resolveAIConfig } from '../../packages/browsecraft/dist/index.js';
+import {
+	defineConfig,
+	resolveAIConfig,
+	resolveConfig,
+} from '../../packages/browsecraft/dist/index.js';
 
 const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';
@@ -183,7 +187,14 @@ test('resolveAIConfig passes through github-models config', () => {
 test('resolveAIConfig "auto" with no env vars returns null', () => {
 	// Save and clear relevant env vars
 	const saved = {};
-	const keys = ['BROWSECRAFT_AI_PROVIDER', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GITHUB_TOKEN', 'BROWSECRAFT_GITHUB_TOKEN', 'OLLAMA_HOST'];
+	const keys = [
+		'BROWSECRAFT_AI_PROVIDER',
+		'OPENAI_API_KEY',
+		'ANTHROPIC_API_KEY',
+		'GITHUB_TOKEN',
+		'BROWSECRAFT_GITHUB_TOKEN',
+		'OLLAMA_HOST',
+	];
 	for (const key of keys) {
 		saved[key] = process.env[key];
 		delete process.env[key];
@@ -202,7 +213,14 @@ test('resolveAIConfig "auto" with no env vars returns null', () => {
 
 test('resolveAIConfig "auto" detects GITHUB_TOKEN', () => {
 	const saved = {};
-	const keys = ['BROWSECRAFT_AI_PROVIDER', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GITHUB_TOKEN', 'BROWSECRAFT_GITHUB_TOKEN', 'OLLAMA_HOST'];
+	const keys = [
+		'BROWSECRAFT_AI_PROVIDER',
+		'OPENAI_API_KEY',
+		'ANTHROPIC_API_KEY',
+		'GITHUB_TOKEN',
+		'BROWSECRAFT_GITHUB_TOKEN',
+		'OLLAMA_HOST',
+	];
 	for (const key of keys) {
 		saved[key] = process.env[key];
 		delete process.env[key];
@@ -223,7 +241,14 @@ test('resolveAIConfig "auto" detects GITHUB_TOKEN', () => {
 
 test('resolveAIConfig "auto" detects OPENAI_API_KEY', () => {
 	const saved = {};
-	const keys = ['BROWSECRAFT_AI_PROVIDER', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GITHUB_TOKEN', 'BROWSECRAFT_GITHUB_TOKEN', 'OLLAMA_HOST'];
+	const keys = [
+		'BROWSECRAFT_AI_PROVIDER',
+		'OPENAI_API_KEY',
+		'ANTHROPIC_API_KEY',
+		'GITHUB_TOKEN',
+		'BROWSECRAFT_GITHUB_TOKEN',
+		'OLLAMA_HOST',
+	];
 	for (const key of keys) {
 		saved[key] = process.env[key];
 		delete process.env[key];
@@ -244,7 +269,14 @@ test('resolveAIConfig "auto" detects OPENAI_API_KEY', () => {
 
 test('resolveAIConfig "auto" detects ANTHROPIC_API_KEY', () => {
 	const saved = {};
-	const keys = ['BROWSECRAFT_AI_PROVIDER', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GITHUB_TOKEN', 'BROWSECRAFT_GITHUB_TOKEN', 'OLLAMA_HOST'];
+	const keys = [
+		'BROWSECRAFT_AI_PROVIDER',
+		'OPENAI_API_KEY',
+		'ANTHROPIC_API_KEY',
+		'GITHUB_TOKEN',
+		'BROWSECRAFT_GITHUB_TOKEN',
+		'OLLAMA_HOST',
+	];
 	for (const key of keys) {
 		saved[key] = process.env[key];
 		delete process.env[key];
@@ -265,7 +297,14 @@ test('resolveAIConfig "auto" detects ANTHROPIC_API_KEY', () => {
 
 test('resolveAIConfig "auto" BROWSECRAFT_AI_PROVIDER overrides auto-detect', () => {
 	const saved = {};
-	const keys = ['BROWSECRAFT_AI_PROVIDER', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GITHUB_TOKEN', 'BROWSECRAFT_GITHUB_TOKEN', 'OLLAMA_HOST'];
+	const keys = [
+		'BROWSECRAFT_AI_PROVIDER',
+		'OPENAI_API_KEY',
+		'ANTHROPIC_API_KEY',
+		'GITHUB_TOKEN',
+		'BROWSECRAFT_GITHUB_TOKEN',
+		'OLLAMA_HOST',
+	];
 	for (const key of keys) {
 		saved[key] = process.env[key];
 		delete process.env[key];
@@ -286,7 +325,14 @@ test('resolveAIConfig "auto" BROWSECRAFT_AI_PROVIDER overrides auto-detect', () 
 
 test('resolveAIConfig "auto" OpenAI takes priority over GitHub Models', () => {
 	const saved = {};
-	const keys = ['BROWSECRAFT_AI_PROVIDER', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GITHUB_TOKEN', 'BROWSECRAFT_GITHUB_TOKEN', 'OLLAMA_HOST'];
+	const keys = [
+		'BROWSECRAFT_AI_PROVIDER',
+		'OPENAI_API_KEY',
+		'ANTHROPIC_API_KEY',
+		'GITHUB_TOKEN',
+		'BROWSECRAFT_GITHUB_TOKEN',
+		'OLLAMA_HOST',
+	];
 	for (const key of keys) {
 		saved[key] = process.env[key];
 		delete process.env[key];

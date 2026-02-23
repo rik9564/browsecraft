@@ -269,7 +269,7 @@ export function classifyFailure(error: unknown): FailureClassification {
 		return {
 			category: 'assertion',
 			retryable: false,
-			description: 'Assertion failed — retrying won\'t help',
+			description: "Assertion failed — retrying won't help",
 		};
 	}
 
@@ -279,12 +279,19 @@ export function classifyFailure(error: unknown): FailureClassification {
 
 	// Assertion-like patterns (from various test frameworks)
 	if (
-		lowerMsg.includes('expected') && (lowerMsg.includes('to equal') || lowerMsg.includes('to be') || lowerMsg.includes('to have') || lowerMsg.includes('to match') || lowerMsg.includes('to contain') || lowerMsg.includes('but got') || lowerMsg.includes('but received'))
+		lowerMsg.includes('expected') &&
+		(lowerMsg.includes('to equal') ||
+			lowerMsg.includes('to be') ||
+			lowerMsg.includes('to have') ||
+			lowerMsg.includes('to match') ||
+			lowerMsg.includes('to contain') ||
+			lowerMsg.includes('but got') ||
+			lowerMsg.includes('but received'))
 	) {
 		return {
 			category: 'assertion',
 			retryable: false,
-			description: 'Assertion failed — retrying won\'t help',
+			description: "Assertion failed — retrying won't help",
 		};
 	}
 

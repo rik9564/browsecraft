@@ -398,7 +398,8 @@ export class AIStepExecutor {
 		this.debugMode = config.debug ?? false;
 		this.cache = new LRUCache(this.cacheSize_);
 		this.systemPrompt = buildSystemPrompt(config.appContext || undefined);
-		this.cachePath = config.cachePath !== null ? (config.cachePath ?? '.browsecraft/ai-cache.json') : null;
+		this.cachePath =
+			config.cachePath !== null ? (config.cachePath ?? '.browsecraft/ai-cache.json') : null;
 		this.confidenceThreshold = config.confidenceThreshold ?? 0.8;
 		this.cacheMode = config.cacheMode ?? 'auto';
 	}
