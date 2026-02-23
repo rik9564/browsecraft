@@ -373,6 +373,8 @@ RULES:
 8. For compound steps, return multiple actions in order
 9. For waits → add waitForSelector or waitForText after navigation/clicks if needed
 10. Confidence: 1.0 for obvious steps, 0.7-0.9 for ambiguous, <0.7 for guesses
+11. IMPORTANT: click() matches element text CASE-SENSITIVELY. Use EXACT casing as shown on the page (e.g. "Login" not "login", "Sign In" not "sign in", "ADD TO CART" not "Add to cart")
+12. For "I should be on the X page" → use waitForURL with the page name as URL pattern (e.g. waitForURL("inventory") for inventory page). Extract just the key word, NOT the full phrase.
 ${contextBlock}
 EXAMPLES:
 
@@ -390,6 +392,9 @@ Step: "I should see 'Welcome back'"
 
 Step: "the URL should contain '/dashboard'"
 {"actions":[{"method":"url","args":[],"description":"Get current URL for assertion"}],"isAssertion":true,"confidence":1.0,"explanation":"Verify the URL contains /dashboard"}
+
+Step: "I should be on the inventory page"
+{"actions":[{"method":"waitForURL","args":["inventory"],"description":"Wait for URL to contain inventory"}],"isAssertion":true,"confidence":0.9,"explanation":"Verify we are on the inventory page by checking the URL"}
 
 Step: "I add the first product to the cart"
 {"actions":[{"method":"click","args":["Add to cart"],"description":"Click the first Add to cart button"}],"isAssertion":false,"confidence":0.8,"explanation":"Click the first 'Add to cart' button on the page"}`;
