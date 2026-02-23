@@ -60,6 +60,15 @@ export interface LocatedElement {
 	strategy: string;
 }
 
+/** Internal strategy entry used by buildStrategies + locateElement */
+interface LocatorStrategy {
+	locator: Locator;
+	strategy: string;
+	isLabelLookup?: boolean;
+	/** Case-insensitive accessible name to match via JS fallback */
+	caseInsensitiveName?: string;
+}
+
 /**
  * Find an element using the smart resolution chain.
  * This auto-waits until the element is found or timeout.
@@ -86,7 +95,7 @@ export async function locateElement(
 				// Try each strategy in order
 				const strategies = buildStrategies(opts);
 
-				for (const { locator, strategy, isLabelLookup } of strategies) {
+				for (const { locator, strategy, isLabelLookup, caseInsensitiveName } of strategies) {
 					try {
 						const result = await session.browsingContext.locateNodes({
 							context: contextId,
@@ -101,6 +110,21 @@ export async function locateElement(
 						);
 
 						if (nodes.length > 0) {
+							// Case-insensitive accessible name filter via JS
+							if (caseInsensitiveName) {
+								const matched = await filterByCIAccessibleName(
+									session,
+									contextId,
+									nodes,
+									caseInsensitiveName,
+									opts.exact ?? false,
+								);
+								if (matched) {
+									return { node: matched, strategy };
+								}
+								continue;
+							}
+
 							// If this is a label lookup, we need to find <label> elements
 							// and resolve their `for` attribute to the associated input
 							if (isLabelLookup) {
@@ -150,7 +174,7 @@ export async function locateAllElements(
 	const opts = normalizeTarget(target);
 	const strategies = buildStrategies(opts);
 
-	for (const { locator, strategy } of strategies) {
+	for (const { locator, strategy, caseInsensitiveName } of strategies) {
 		try {
 			const result = await session.browsingContext.locateNodes({
 				context: contextId,
@@ -161,6 +185,21 @@ export async function locateAllElements(
 			const nodes = result.nodes.filter((n) => !HEAD_ONLY_ELEMENTS.has(n.value?.localName ?? ''));
 
 			if (nodes.length > 0) {
+				// For case-insensitive fallback, filter nodes via JS
+				if (caseInsensitiveName) {
+					const matched = await filterByCIAccessibleName(
+						session,
+						contextId,
+						nodes,
+						caseInsensitiveName,
+						opts.exact ?? false,
+					);
+					if (matched) {
+						return [{ node: matched, strategy }];
+					}
+					continue;
+				}
+
 				return nodes.map((node) => ({ node, strategy }));
 			}
 		} catch {}
@@ -199,10 +238,8 @@ function describeTarget(target: ElementTarget): string {
 }
 
 /** Build an ordered list of BiDi locator strategies to try */
-function buildStrategies(
-	opts: LocatorOptions,
-): Array<{ locator: Locator; strategy: string; isLabelLookup?: boolean }> {
-	const strategies: Array<{ locator: Locator; strategy: string; isLabelLookup?: boolean }> = [];
+function buildStrategies(opts: LocatorOptions): LocatorStrategy[] {
+	const strategies: LocatorStrategy[] = [];
 	const matchType = opts.exact ? 'full' : 'partial';
 
 	// If user specified a specific strategy, only use that one
@@ -249,7 +286,30 @@ function buildStrategies(
 			}
 		}
 
-		// Strategy 2: Inner text -- find by visible text content
+		// Strategy 2: Case-insensitive accessible name fallback
+		// BiDi accessibility locators are case-sensitive. When exact mode is off,
+		// also try a JS-based approach that matches accessible names case-insensitively.
+		// This handles cases like click("login") when the button says "Login".
+		if (!opts.exact) {
+			const ciSelector = [
+				'button',
+				'a',
+				'[role="button"]',
+				'[role="link"]',
+				'[role="menuitem"]',
+				'[role="tab"]',
+				'input[type="submit"]',
+				'input[type="button"]',
+				'input[type="reset"]',
+			].join(', ');
+			strategies.push({
+				locator: { type: 'css', value: ciSelector },
+				strategy: `accessible-name-ci("${name}")`,
+				caseInsensitiveName: name,
+			});
+		}
+
+		// Strategy 3: Inner text -- find by visible text content
 		strategies.push({
 			locator: {
 				type: 'innerText',
@@ -373,6 +433,70 @@ async function resolveLabelsToInputs(
 			}
 		} catch {}
 	}
+
+	return null;
+}
+
+/**
+ * Filter a set of candidate nodes by case-insensitive accessible name.
+ * Uses a JS callFunction to compare the element's computed text
+ * (value, textContent, aria-label, title) against the search name.
+ *
+ * This is the fallback for when the BiDi accessibility locator
+ * (which is case-sensitive) fails to match.
+ */
+async function filterByCIAccessibleName(
+	session: BiDiSession,
+	contextId: string,
+	nodes: NodeRemoteValue[],
+	name: string,
+	exact: boolean,
+): Promise<NodeRemoteValue | null> {
+	// Batch check: pass all nodes at once to minimize round-trips
+	const nodeArgs = nodes.filter((n) => n.sharedId);
+	if (nodeArgs.length === 0) return null;
+
+	try {
+		const result = await session.script.callFunction({
+			functionDeclaration: `function(name, exact, ...elements) {
+				const lower = name.toLowerCase();
+				for (const el of elements) {
+					if (!el) continue;
+					const candidates = [
+						el.getAttribute('aria-label') || '',
+						el.getAttribute('value') || '',
+						(el.innerText || el.textContent || '').trim(),
+						el.getAttribute('title') || '',
+						el.getAttribute('placeholder') || '',
+					];
+					for (const c of candidates) {
+						if (!c) continue;
+						const cl = c.toLowerCase();
+						if (exact ? cl === lower : cl.includes(lower) || lower.includes(cl)) {
+							return el;
+						}
+					}
+				}
+				return null;
+			}`,
+			target: { context: contextId },
+			arguments: [
+				{ type: 'string', value: name },
+				{ type: 'boolean', value: exact },
+				...nodeArgs.map((n) => ({ sharedId: n.sharedId!, handle: n.handle })),
+			],
+			awaitPromise: false,
+			resultOwnership: 'root',
+		});
+
+		if (
+			result.type === 'success' &&
+			result.result?.type === 'node' &&
+			(result.result as NodeRemoteValue).sharedId
+		) {
+			return result.result as NodeRemoteValue;
+		}
+	} catch {}
 
 	return null;
 }
