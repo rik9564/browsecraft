@@ -21,6 +21,40 @@ import { type StepFunction, type StepRegistry, globalRegistry } from './step-reg
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Default timeout for polling assertions (ms) */
+const ASSERTION_POLL_TIMEOUT = 10_000;
+/** Default polling interval (ms) */
+const ASSERTION_POLL_INTERVAL = 200;
+
+/**
+ * Poll an assertion until it passes or times out.
+ * Used for URL/title checks that may need to wait for navigation to complete
+ * (e.g., cross-origin click navigations where the page is briefly unavailable).
+ */
+async function pollAssertion(
+	description: string,
+	fn: () => Promise<void>,
+	timeout = ASSERTION_POLL_TIMEOUT,
+): Promise<void> {
+	const start = Date.now();
+	let lastError: Error | undefined;
+
+	while (Date.now() - start < timeout) {
+		try {
+			await fn();
+			return; // assertion passed
+		} catch (err) {
+			lastError = err instanceof Error ? err : new Error(String(err));
+		}
+		await new Promise((r) => setTimeout(r, ASSERTION_POLL_INTERVAL));
+	}
+
+	// Final attempt — let the error propagate naturally
+	if (lastError) {
+		throw lastError;
+	}
+}
+
 /**
  * Duck-typed interface for the Page object methods used by built-in steps.
  * Since browsecraft-bdd doesn't depend on the core browsecraft package, we
@@ -282,10 +316,12 @@ const steps: StepEntry[] = [
 		pattern: 'the URL should contain {string}',
 		fn: async (world, expected) => {
 			const page = getPage(world);
-			const url = await page.url();
-			if (!url.includes(expected as string)) {
-				throw new Error(`Expected URL to contain "${expected}", got "${url}"`);
-			}
+			await pollAssertion(`URL to contain "${expected}"`, async () => {
+				const url = await page.url();
+				if (!url.includes(expected as string)) {
+					throw new Error(`Expected URL to contain "${expected}", got "${url}"`);
+				}
+			});
 		},
 	},
 	{
@@ -293,10 +329,12 @@ const steps: StepEntry[] = [
 		pattern: 'the URL should be {string}',
 		fn: async (world, expected) => {
 			const page = getPage(world);
-			const url = await page.url();
-			if (url !== expected) {
-				throw new Error(`Expected URL to be "${expected}", got "${url}"`);
-			}
+			await pollAssertion(`URL to be "${expected}"`, async () => {
+				const url = await page.url();
+				if (url !== expected) {
+					throw new Error(`Expected URL to be "${expected}", got "${url}"`);
+				}
+			});
 		},
 	},
 
@@ -308,10 +346,12 @@ const steps: StepEntry[] = [
 		pattern: 'the title should be {string}',
 		fn: async (world, expected) => {
 			const page = getPage(world);
-			const title = await page.title();
-			if (title !== expected) {
-				throw new Error(`Expected title to be "${expected}", got "${title}"`);
-			}
+			await pollAssertion(`title to be "${expected}"`, async () => {
+				const title = await page.title();
+				if (title !== expected) {
+					throw new Error(`Expected title to be "${expected}", got "${title}"`);
+				}
+			});
 		},
 	},
 	{
@@ -319,10 +359,12 @@ const steps: StepEntry[] = [
 		pattern: 'the title should contain {string}',
 		fn: async (world, expected) => {
 			const page = getPage(world);
-			const title = await page.title();
-			if (!title.includes(expected as string)) {
-				throw new Error(`Expected title to contain "${expected}", got "${title}"`);
-			}
+			await pollAssertion(`title to contain "${expected}"`, async () => {
+				const title = await page.title();
+				if (!title.includes(expected as string)) {
+					throw new Error(`Expected title to contain "${expected}", got "${title}"`);
+				}
+			});
 		},
 	},
 

@@ -494,34 +494,33 @@ export class Page {
 	// Page state
 	// -----------------------------------------------------------------------
 
-	/** Get the current page URL */
+	/**
+	 * Get the current page URL.
+	 *
+	 * Resilient to transient "Cannot find context" errors that occur briefly
+	 * during cross-origin navigations (e.g., clicking a link from example.com
+	 * to iana.org). Retries for up to 5 seconds before giving up.
+	 */
 	async url(): Promise<string> {
-		const result = await this.session.script.evaluate({
-			expression: 'window.location.href',
-			target: { context: this.contextId },
-			awaitPromise: false,
-		});
-		return this.extractStringResult(result) ?? '';
+		return this.evaluateWithNavRetry('window.location.href');
 	}
 
-	/** Get the page title */
+	/**
+	 * Get the page title.
+	 *
+	 * Resilient to transient context errors during cross-origin navigation.
+	 */
 	async title(): Promise<string> {
-		const result = await this.session.script.evaluate({
-			expression: 'document.title',
-			target: { context: this.contextId },
-			awaitPromise: false,
-		});
-		return this.extractStringResult(result) ?? '';
+		return this.evaluateWithNavRetry('document.title');
 	}
 
-	/** Get the full page HTML content */
+	/**
+	 * Get the full page HTML content.
+	 *
+	 * Resilient to transient context errors during cross-origin navigation.
+	 */
 	async content(): Promise<string> {
-		const result = await this.session.script.evaluate({
-			expression: 'document.documentElement.outerHTML',
-			target: { context: this.contextId },
-			awaitPromise: false,
-		});
-		return this.extractStringResult(result) ?? '';
+		return this.evaluateWithNavRetry('document.documentElement.outerHTML');
 	}
 
 	// -----------------------------------------------------------------------
@@ -1780,6 +1779,33 @@ export class Page {
 			arguments: [ref, { type: 'number', value: clickCount }],
 			awaitPromise: false,
 		});
+	}
+
+	/**
+	 * Evaluate a simple string expression with automatic retry on transient
+	 * context errors.  During cross-origin navigation the JavaScript realm is
+	 * destroyed and recreated — any `script.evaluate` call in that brief
+	 * window receives "Cannot find context with specified id".  This helper
+	 * uses the existing `waitFor` polling engine to retry until the new realm
+	 * is ready (up to `timeout` ms, default 5 000).
+	 */
+	private async evaluateWithNavRetry(expression: string, timeout = 5_000): Promise<string> {
+		return waitFor(
+			`evaluate "${expression}"`,
+			async () => {
+				const result = await this.session.script.evaluate({
+					expression,
+					target: { context: this.contextId },
+					awaitPromise: false,
+				});
+				const value = this.extractStringResult(result);
+				// Return the string value — even empty string is valid.
+				// null means the result wasn't a string (e.g., page mid-navigation
+				// returned an exception), so we return null to trigger a retry.
+				return value;
+			},
+			{ timeout, interval: 100 },
+		);
 	}
 
 	/** Extract a string from a script evaluation result */
