@@ -57,6 +57,7 @@ import type {
 	StorageSetCookieParams,
 	StorageSetCookieResult,
 } from './types.js';
+import { sanitize } from './utils.js';
 
 export type { EventHandler } from './transport.js';
 
@@ -138,7 +139,15 @@ export class BiDiSession {
 		if (options.debug) {
 			transportOptions.onRawMessage = (dir, data) => {
 				const prefix = dir === 'send' ? '>>> SEND' : '<<< RECV';
-				console.log(`${prefix}: ${data.slice(0, 500)}`);
+				let logData = data;
+				try {
+					const parsed = JSON.parse(data);
+					const sanitized = sanitize(parsed);
+					logData = JSON.stringify(sanitized);
+				} catch {
+					// Fallback to raw data if not JSON
+				}
+				console.log(`${prefix}: ${logData.slice(0, 500)}`);
 			};
 		}
 
