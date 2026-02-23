@@ -1,6 +1,6 @@
 {
 	"name": "browsecraft",
-	"version": "0.3.0",
+	"version": "0.4.0",
 	"description": "AI-native browser automation framework. Craft browser tests that just work.",
 	"type": "module",
 	"main": "./dist/index.cjs",
