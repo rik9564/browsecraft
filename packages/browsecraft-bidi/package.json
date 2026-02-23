@@ -1,6 +1,6 @@
 {
 	"name": "browsecraft-bidi",
-	"version": "0.6.2",
+	"version": "0.6.3",
 	"description": "WebDriver BiDi protocol client for Browsecraft",
 	"type": "module",
 	"main": "./dist/index.cjs",
