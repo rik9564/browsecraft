@@ -190,11 +190,19 @@ export class Browser {
 		try {
 			const result = await this.session.send('browser.createUserContext', {});
 			const userContext = (result as { userContext: string }).userContext;
+
+			// Close Chrome's initial about:blank tab — it belongs to the default
+			// context and can't be reused inside the new isolated context, so it
+			// just lingers as a ghost window.
+			await this.closeOrphanBlankTabs();
+
 			return new BrowserContext(this.session, this.config, userContext);
 		} catch (err) {
 			console.warn(
 				`[browsecraft] Warning: browser.createUserContext is not supported. Pages will share cookies/storage. ${err instanceof Error ? err.message : String(err)}`,
 			);
+			// Still clean up blank tabs even in fallback mode
+			await this.closeOrphanBlankTabs();
 			return new BrowserContext(this.session, this.config, null);
 		}
 	}
@@ -216,6 +224,30 @@ export class Browser {
 	/** Get the resolved config */
 	getConfig(): BrowsecraftConfig {
 		return { ...this.config };
+	}
+
+	/**
+	 * Close any about:blank tabs that aren't tracked as pages.
+	 * Chrome (and some other browsers) always opens with an initial blank tab.
+	 * When we create an isolated context, that tab can't be reused (wrong context)
+	 * and just sits there as a ghost window. This method cleans it up.
+	 * @internal
+	 */
+	private async closeOrphanBlankTabs(): Promise<void> {
+		try {
+			const tree = await this.session.browsingContext.getTree();
+			const contexts = tree.contexts ?? [];
+			for (const ctx of contexts) {
+				const alreadyTracked = this.pages.some(
+					(p) => (p as any).contextId === ctx.context,
+				);
+				if (!alreadyTracked && ctx.url === 'about:blank') {
+					await this.session.browsingContext.close({ context: ctx.context }).catch(() => {});
+				}
+			}
+		} catch {
+			// getTree or close not supported — ignore
+		}
 	}
 
 	/**
