@@ -137,18 +137,15 @@ export async function checkActionability(
 		enabled?: boolean;
 		/** Check that nothing obscures the element (default: false — expensive) */
 		notObscured?: boolean;
-		/** Return full element state for debugging (default: true — expensive) */
-		returnState?: boolean;
 	} = {},
 ): Promise<ActionabilityResult> {
 	const doVisible = checks.visible !== false;
 	const doEnabled = checks.enabled !== false;
 	const doObscured = checks.notObscured === true;
-	const returnState = checks.returnState !== false;
 
 	try {
 		const result = await session.script.callFunction({
-			functionDeclaration: `function(el, doVisible, doEnabled, doObscured, returnState) {
+			functionDeclaration: `function(el, doVisible, doEnabled, doObscured) {
 				// Check if element is still in the DOM
 				if (!el.isConnected) {
 					return {
@@ -161,29 +158,23 @@ export async function checkActionability(
 				const style = window.getComputedStyle(el);
 				const rect = el.getBoundingClientRect();
 				const tagName = el.tagName || '';
+				const textPreview = (el.innerText || el.textContent || '').slice(0, 80).trim();
+				const classes = el.className || '';
+				const id = el.id || '';
 
-				let state;
-				if (returnState) {
-					const textPreview = (el.innerText || el.textContent || '').slice(0, 80).trim();
-					const classes = el.className || '';
-					const id = el.id || '';
-
-					state = {
-						found: true,
-						tagName: tagName,
-						textPreview: textPreview,
-						classes: typeof classes === 'string' ? classes : '',
-						id: id,
-						boundingBox: {
-							x: Math.round(rect.x),
-							y: Math.round(rect.y),
-							width: Math.round(rect.width),
-							height: Math.round(rect.height)
-						}
-					};
-				} else {
-					state = { found: true };
-				}
+				const state = {
+					found: true,
+					tagName: tagName,
+					textPreview: textPreview,
+					classes: typeof classes === 'string' ? classes : '',
+					id: id,
+					boundingBox: {
+						x: Math.round(rect.x),
+						y: Math.round(rect.y),
+						width: Math.round(rect.width),
+						height: Math.round(rect.height)
+					}
+				};
 
 				// Visibility check
 				if (doVisible) {
@@ -193,7 +184,7 @@ export async function checkActionability(
 						&& rect.width > 0
 						&& rect.height > 0;
 
-					if (returnState) state.visible = isVisible;
+					state.visible = isVisible;
 
 					if (!isVisible) {
 						if (rect.width === 0 || rect.height === 0) {
@@ -208,7 +199,7 @@ export async function checkActionability(
 					const formTags = ['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA', 'FIELDSET'];
 					const isFormElement = formTags.includes(tagName);
 					const isDisabled = isFormElement && el.disabled === true;
-					if (returnState) state.enabled = !isDisabled;
+					state.enabled = !isDisabled;
 
 					if (isDisabled) {
 						return { actionable: false, reason: 'disabled', state: state };
@@ -222,22 +213,18 @@ export async function checkActionability(
 					const topEl = document.elementFromPoint(cx, cy);
 
 					if (topEl && topEl !== el && !el.contains(topEl)) {
-						if (returnState) {
-							state.obscured = true;
-							state.obscuredBy = '<' + topEl.tagName.toLowerCase()
-								+ (topEl.id ? '#' + topEl.id : '')
-								+ (topEl.className ? '.' + topEl.className.split(' ').join('.') : '')
-								+ '>';
-						}
+						state.obscured = true;
+						state.obscuredBy = '<' + topEl.tagName.toLowerCase()
+							+ (topEl.id ? '#' + topEl.id : '')
+							+ (topEl.className ? '.' + topEl.className.split(' ').join('.') : '')
+							+ '>';
 						return { actionable: false, reason: 'obscured', state: state };
 					}
-					if (returnState) state.obscured = false;
+					state.obscured = false;
 				}
 
-				if (returnState) {
-					state.visible = true;
-					state.enabled = true;
-				}
+				state.visible = true;
+				state.enabled = true;
 				return { actionable: true, state: state };
 			}`,
 			target: { context: contextId },
@@ -246,7 +233,6 @@ export async function checkActionability(
 				{ type: 'boolean', value: doVisible },
 				{ type: 'boolean', value: doEnabled },
 				{ type: 'boolean', value: doObscured },
-				{ type: 'boolean', value: returnState },
 			],
 			awaitPromise: false,
 		});
@@ -292,33 +278,21 @@ export async function waitForActionable(
 		return await waitFor(
 			`${description} to be actionable`,
 			async () => {
-				// Optimization: Don't compute full state (innerText, etc) in the hot loop
-				const result = await checkActionability(session, contextId, ref, {
-					...checks,
-					returnState: false,
-				});
+				const result = await checkActionability(session, contextId, ref, checks);
 				lastResult = result;
 				return result.actionable ? result : null;
 			},
 			options,
 		);
 	} catch {
-		// If timed out, fetch the FULL state for the error report
-		try {
-			return await checkActionability(session, contextId, ref, {
-				...checks,
-				returnState: true,
-			});
-		} catch {
-			// If re-checking fails (e.g. element detached), fall back to last known result
-			return (
-				lastResult ?? {
-					actionable: false,
-					reason: 'not-visible',
-					state: { found: true },
-				}
-			);
-		}
+		// Return the last known state for error reporting
+		return (
+			lastResult ?? {
+				actionable: false,
+				reason: 'not-visible',
+				state: { found: true },
+			}
+		);
 	}
 }
 
