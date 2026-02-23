@@ -5,7 +5,6 @@
 // ============================================================================
 
 import { type BidiOverCdpConnection, connectBidiOverCdp } from './bidi-over-cdp.js';
-import { sanitize } from './utils.js';
 import {
 	type BrowserName,
 	type LaunchOptions,
@@ -58,6 +57,7 @@ import type {
 	StorageSetCookieParams,
 	StorageSetCookieResult,
 } from './types.js';
+import { sanitize } from './utils.js';
 
 export type { EventHandler } from './transport.js';
 
