@@ -36,6 +36,6 @@
 		}
 	},
 	"files": {
-		"ignore": ["node_modules", "dist", ".turbo", "*.d.ts", "pnpm-lock.yaml"]
+		"ignore": ["node_modules", "dist", ".turbo", "*.d.ts", "pnpm-lock.yaml", ".browsecraft"]
 	}
 }
