@@ -777,11 +777,15 @@ function parseDocString(state: ParserState): DocString {
 		}
 
 		// De-indent according to opening delimiter position
-		if (indent > 0 && ln.length > indent) {
-			contentLines.push(ln.slice(indent));
-		} else {
-			contentLines.push(ln.trimStart());
+		let stripCount = 0;
+		while (
+			stripCount < indent &&
+			stripCount < ln.length &&
+			(ln[stripCount] === ' ' || ln[stripCount] === '\t')
+		) {
+			stripCount++;
 		}
+		contentLines.push(ln.slice(stripCount));
 
 		state.pos++;
 	}

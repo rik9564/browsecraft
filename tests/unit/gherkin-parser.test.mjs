@@ -274,6 +274,74 @@ Feature: F
 	assert.ok(step.docString.content.includes('"key"'));
 });
 
+test('preserves indentation in doc strings', () => {
+	const doc = parseGherkin(`
+Feature: F
+  Scenario: S
+    Given a doc string
+      """
+      Line 1
+        Line 2
+      Line 3
+      """
+`);
+	const step = doc.feature.children[0].scenario.steps[0];
+	assert.equal(step.docString.content, 'Line 1\n  Line 2\nLine 3');
+});
+
+test('handles under-indented doc string content', () => {
+	const doc = parseGherkin(`
+Feature: F
+  Scenario: S
+    Given a doc string
+      """
+    Under
+      """
+`);
+	const step = doc.feature.children[0].scenario.steps[0];
+	// We expect "Under" to be preserved correctly, not sliced to "der"
+	assert.equal(step.docString.content, 'Under');
+});
+
+test('handles doc strings with various media types', () => {
+	const doc = parseGherkin(`
+Feature: F
+  Scenario: S
+    Given code:
+      \`\`\`typescript
+      const x = 1;
+      \`\`\`
+`);
+	const step = doc.feature.children[0].scenario.steps[0];
+	assert.equal(step.docString.mediaType, 'typescript');
+	assert.equal(step.docString.content, 'const x = 1;');
+});
+
+test('handles empty doc strings', () => {
+	const doc = parseGherkin(`
+Feature: F
+  Scenario: S
+    Given nothing:
+      """
+      """
+`);
+	const step = doc.feature.children[0].scenario.steps[0];
+	assert.equal(step.docString.content, '');
+});
+
+test('handles doc strings with no indentation', () => {
+	const doc = parseGherkin(`Feature: F
+Scenario: S
+Given something:
+"""
+  Indented content
+"""
+`);
+	const step = doc.feature.children[0].scenario.steps[0];
+	// indent is 0, so "  Indented content" should remain "  Indented content"
+	assert.equal(step.docString.content, '  Indented content');
+});
+
 // -----------------------------------------------------------------------
 // Scenario Outline / Examples
 // -----------------------------------------------------------------------
