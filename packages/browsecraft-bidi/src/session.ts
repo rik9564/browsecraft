@@ -245,6 +245,20 @@ export class BiDiSession {
 		return this.transport.send(method, params);
 	}
 
+	/**
+	 * Send a raw CDP command bypassing the BiDi protocol layer.
+	 * Only works with Chrome/Edge (BiDi-over-CDP). Throws on Firefox.
+	 */
+	async sendCdpCommand(
+		method: string,
+		params: Record<string, unknown> = {},
+	): Promise<Record<string, unknown>> {
+		if (!this.cdpConnection) {
+			throw new Error('CDP commands not available (Firefox uses native BiDi)');
+		}
+		return this.cdpConnection.sendCdpCommand(method, params);
+	}
+
 	/** Whether the session is connected */
 	get isConnected(): boolean {
 		return this.transport.isConnected;

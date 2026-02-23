@@ -18,6 +18,11 @@ export interface BidiOverCdpConnection {
 	onBidiMessage: (handler: (message: string) => void) => void;
 	/** Close everything */
 	close: () => void;
+	/** Send a raw CDP command (e.g., Browser.setWindowBounds) bypassing BiDi */
+	sendCdpCommand: (
+		method: string,
+		params?: Record<string, unknown>,
+	) => Promise<Record<string, unknown>>;
 }
 
 /**
@@ -151,6 +156,13 @@ export async function connectBidiOverCdp(
 		close() {
 			bidiServer.close();
 			cdpTransport.close();
+		},
+
+		async sendCdpCommand(
+			method: string,
+			params: Record<string, unknown> = {},
+		): Promise<Record<string, unknown>> {
+			return browserCdpClient.sendCommand(method, params);
 		},
 	};
 }

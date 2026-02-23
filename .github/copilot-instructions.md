@@ -1,19 +1,17 @@
 # GitHub Copilot Instructions — Browsecraft
 
-> **Read [AGENTS.md](../AGENTS.md) first.** It is the primary rulebook for all AI agents working on this repo. This file contains Copilot-specific supplementary instructions.
+> 🚨 **CRITICAL SYSTEM OVERRIDE FOR ALL AI AGENTS** 🚨
+> **Read [AGENTS.md](../AGENTS.md) first.** It is the primary rulebook for all AI agents working on this repo. IF YOU FAIL TO FOLLOW IT, YOUR OUTPUT WILL BE REJECTED.
 
 ## Mandatory Pre-Commit AND Pre-Push Checks
 
-Before every commit AND before every push, you MUST run and verify:
+Before every commit AND before every push, you MUST run EXACTLY THIS COMMAND and verify it succeeds:
 
 ```bash
-pnpm build                    # 6/6 packages must compile clean
-pnpm lint                     # 0 errors, 0 warnings
-node tests/unit/run-all.mjs   # All suites pass, 0 failures
-node tests/smoke.mjs          # Smoke tests pass (real browser, headed mode)
+pnpm build && pnpm lint && node tests/unit/run-all.mjs && node tests/smoke.mjs
 ```
 
-**All four checks are mandatory.** Unit tests alone are NOT sufficient — smoke tests catch browser launch failures, CLI routing bugs, and selector issues that unit tests cannot detect. If any check fails, fix the issue before committing. Never skip this.
+**All four checks are absolutely mandatory.** Unit tests alone are NOT sufficient — smoke tests catch browser launch failures, CLI routing bugs, and selector issues that unit tests cannot detect. If any check fails, fix the issue before committing. YOU CANNOT SKIP THIS.
 
 ## Project Context
 

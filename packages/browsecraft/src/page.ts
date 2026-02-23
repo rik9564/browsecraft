@@ -206,9 +206,10 @@ export class Page {
 	async fill(target: ElementTarget, value: string, options?: FillOptions): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
 
-		// For string targets, treat as label/placeholder for inputs
-		const resolvedTarget: ElementTarget =
-			typeof target === 'string' ? { label: target, name: target } : target;
+		// For string targets, resolve as a form input label/placeholder/accessible-name.
+		// Using only { label } avoids the generic innerText strategy which can match
+		// non-input elements (e.g. headings containing the word "Username").
+		const resolvedTarget: ElementTarget = typeof target === 'string' ? { label: target } : target;
 
 		const located = await this.locateWithHealing(resolvedTarget, 'fill', { timeout });
 
@@ -253,8 +254,9 @@ export class Page {
 	async type(target: ElementTarget, text: string, options?: FillOptions): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
 
-		const resolvedTarget: ElementTarget =
-			typeof target === 'string' ? { label: target, name: target } : target;
+		// For string targets, resolve as a form input label/placeholder/accessible-name.
+		// Using only { label } avoids innerText matching non-input elements.
+		const resolvedTarget: ElementTarget = typeof target === 'string' ? { label: target } : target;
 
 		const located = await this.locateWithHealing(resolvedTarget, 'type', { timeout });
 
@@ -291,8 +293,7 @@ export class Page {
 	 */
 	async select(target: ElementTarget, value: string, options?: FillOptions): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const resolvedTarget: ElementTarget =
-			typeof target === 'string' ? { label: target, name: target } : target;
+		const resolvedTarget: ElementTarget = typeof target === 'string' ? { label: target } : target;
 
 		const located = await this.locateWithHealing(resolvedTarget, 'select', { timeout });
 
@@ -843,8 +844,7 @@ export class Page {
 	 */
 	async focus(target: ElementTarget, options?: { timeout?: number }): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const resolvedTarget: ElementTarget =
-			typeof target === 'string' ? { label: target, name: target } : target;
+		const resolvedTarget: ElementTarget = typeof target === 'string' ? { label: target } : target;
 		const located = await this.locateWithHealing(resolvedTarget, 'focus', { timeout });
 
 		await this.ensureActionable(located, 'focus', target, { timeout, enabled: false });
@@ -868,8 +868,7 @@ export class Page {
 	 */
 	async blur(target: ElementTarget, options?: { timeout?: number }): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const resolvedTarget: ElementTarget =
-			typeof target === 'string' ? { label: target, name: target } : target;
+		const resolvedTarget: ElementTarget = typeof target === 'string' ? { label: target } : target;
 		const located = await this.locateWithHealing(resolvedTarget, 'blur', { timeout });
 		const ref = this.getSharedRef(located.node);
 
@@ -934,8 +933,7 @@ export class Page {
 	 */
 	async inputValue(target: ElementTarget, options?: { timeout?: number }): Promise<string> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const resolvedTarget: ElementTarget =
-			typeof target === 'string' ? { label: target, name: target } : target;
+		const resolvedTarget: ElementTarget = typeof target === 'string' ? { label: target } : target;
 		const located = await this.locateWithHealing(resolvedTarget, 'inputValue', { timeout });
 		const ref = this.getSharedRef(located.node);
 
@@ -962,8 +960,7 @@ export class Page {
 		options?: FillOptions,
 	): Promise<void> {
 		const timeout = options?.timeout ?? this.config.timeout;
-		const resolvedTarget: ElementTarget =
-			typeof target === 'string' ? { label: target, name: target } : target;
+		const resolvedTarget: ElementTarget = typeof target === 'string' ? { label: target } : target;
 		const located = await this.locateWithHealing(resolvedTarget, 'selectOption', { timeout });
 
 		await this.ensureActionable(located, 'selectOption', target, { timeout });

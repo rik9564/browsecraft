@@ -74,6 +74,8 @@ npx browsecraft test --bdd             # Run BDD feature files
 npx browsecraft test --bdd --scenario "login"        # Run specific BDD scenario
 npx browsecraft test --bdd features/login.feature:15 # Run scenario at line 15
 npx browsecraft test --bdd --tag "@smoke"             # Filter by tag
+npx browsecraft test --bdd --ai-steps auto            # AI fallback for undefined steps
+npx browsecraft test --bdd --ai-steps locked          # Cache-only AI (CI-friendly)
 npx browsecraft setup-ide              # Generate IDE config for step discovery
 ```
 
@@ -547,6 +549,26 @@ const executor = new BddExecutor({
   // ...
 });
 ```
+
+### Runtime AI Steps (Optional)
+
+Enable AI interpretation for undefined BDD steps with a single mode:
+
+```ts
+import { defineConfig } from 'browsecraft';
+
+export default defineConfig({
+  ai: 'auto', // or { provider: 'openai' } / { provider: 'anthropic' } / { provider: 'ollama' }
+  bdd: {
+    aiSteps: 'auto', // 'off' | 'auto' | 'locked' | 'warm'
+  },
+});
+```
+
+- `'off'`: no runtime AI (default)
+- `'auto'`: use cache, call AI on misses
+- `'locked'`: cache only, no live AI calls
+- `'warm'`: always call AI and refresh cache
 
 ### Hooks
 

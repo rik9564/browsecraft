@@ -40,6 +40,7 @@ export type {
 	AnthropicConfig,
 	OllamaConfig,
 	BddConfig,
+	BddAIStepsMode,
 	ExecutionStrategy,
 } from './config.js';
 

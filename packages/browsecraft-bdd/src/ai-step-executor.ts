@@ -36,7 +36,6 @@
 import type { ChatMessage } from 'browsecraft-ai';
 import {
 	type ProviderConfig,
-	getDefaultModel,
 	getProviderLabel,
 	isProviderAvailable,
 	providerChat,
@@ -263,6 +262,37 @@ class LRUCache<K, V> {
  */
 function normalizeForCache(stepText: string): string {
 	return stepText.trim().toLowerCase();
+}
+
+function isPromiseLike<T = unknown>(value: unknown): value is PromiseLike<T> {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		'then' in value &&
+		typeof (value as { then?: unknown }).then === 'function'
+	);
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+	let timer: NodeJS.Timeout | undefined;
+
+	try {
+		return await new Promise<T>((resolve, reject) => {
+			timer = setTimeout(() => {
+				reject(new Error(message));
+			}, timeoutMs);
+
+			if (timer && typeof timer === 'object' && 'unref' in timer) {
+				timer.unref();
+			}
+
+			promise.then(resolve, reject);
+		});
+	} finally {
+		if (timer) {
+			clearTimeout(timer);
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -497,25 +527,27 @@ export class AIStepExecutor {
 		// Load persistent cache on first call
 		await this.loadDiskCache();
 
-		// Check AI availability (cached after first check)
-		if (this.aiAvailable === null) {
-			this.aiAvailable = await isProviderAvailable(this.providerConfig);
-		}
+		// In locked mode we run cache-only and never need provider/network checks.
+		if (this.cacheMode !== 'locked') {
+			// Check AI availability (cached after first check)
+			if (this.aiAvailable === null) {
+				this.aiAvailable = await isProviderAvailable(this.providerConfig);
+			}
 
-		// In locked mode, AI availability is not required — we only use cache
-		if (!this.aiAvailable && this.cacheMode !== 'locked') {
-			const label = getProviderLabel(this.providerConfig.provider);
-			return {
-				handled: false,
-				plan: null,
-				passed: false,
-				error: new Error(
-					`AI step execution unavailable (${label}). Set the appropriate env var: GITHUB_TOKEN, OPENAI_API_KEY, ANTHROPIC_API_KEY, or OLLAMA_HOST.`,
-				),
-				cached: false,
-				aiTime: 0,
-				execTime: 0,
-			};
+			if (!this.aiAvailable) {
+				const label = getProviderLabel(this.providerConfig.provider);
+				return {
+					handled: false,
+					plan: null,
+					passed: false,
+					error: new Error(
+						`AI step execution unavailable (${label}). Set the appropriate env var: GITHUB_TOKEN, OPENAI_API_KEY, ANTHROPIC_API_KEY, or OLLAMA_HOST.`,
+					),
+					cached: false,
+					aiTime: 0,
+					execTime: 0,
+				};
+			}
 		}
 
 		// 1. Check cache
@@ -645,10 +677,15 @@ export class AIStepExecutor {
 		];
 
 		try {
-			const response = await providerChat(messages, this.providerConfig, {
-				temperature: 0.1,
-				maxTokens: 1024,
-			});
+			const label = getProviderLabel(this.providerConfig.provider);
+			const response = await withTimeout(
+				providerChat(messages, this.providerConfig, {
+					temperature: 0.1,
+					maxTokens: 1024,
+				}),
+				this.aiTimeout,
+				`AI interpretation timed out after ${this.aiTimeout}ms (${label})`,
+			);
 
 			if (!response) return null;
 
@@ -671,34 +708,20 @@ export class AIStepExecutor {
 				throw new Error(`Page method "${action.method}" not found. Step: "${stepText}"`);
 			}
 
-			// Execute with timeout
+			const actionCall = `${action.method}(${action.args.map((a) => JSON.stringify(a)).join(', ')})`;
 			const result = method.apply(page, action.args);
-
-			if (result instanceof Promise) {
-				await Promise.race([
-					result,
-					new Promise<never>((_, reject) => {
-						const timer = setTimeout(
-							() =>
-								reject(
-									new Error(
-										`Action timed out after ${this.actionTimeout}ms: ${action.method}(${action.args.map((a) => JSON.stringify(a)).join(', ')})`,
-									),
-								),
-							this.actionTimeout,
-						);
-						// Ensure the timer doesn't prevent process exit
-						if (typeof timer === 'object' && 'unref' in timer) {
-							(timer as NodeJS.Timeout).unref();
-						}
-					}),
-				]);
-			}
+			const resolvedResult = isPromiseLike(result)
+				? await withTimeout(
+						Promise.resolve(result),
+						this.actionTimeout,
+						`Action timed out after ${this.actionTimeout}ms: ${actionCall}`,
+					)
+				: result;
 
 			// For assertion steps that return a value (url(), title(), innerText()),
 			// we need to check the result against the step text
-			if (plan.isAssertion && action.method === 'url' && result !== undefined) {
-				const urlResult = result instanceof Promise ? await result : result;
+			if (plan.isAssertion && action.method === 'url' && resolvedResult !== undefined) {
+				const urlResult = resolvedResult;
 				if (typeof urlResult === 'string') {
 					// Extract expected match from the step text
 					const expected = extractExpectedValue(stepText);
@@ -710,8 +733,8 @@ export class AIStepExecutor {
 				}
 			}
 
-			if (plan.isAssertion && action.method === 'title' && result !== undefined) {
-				const titleResult = result instanceof Promise ? await result : result;
+			if (plan.isAssertion && action.method === 'title' && resolvedResult !== undefined) {
+				const titleResult = resolvedResult;
 				if (typeof titleResult === 'string') {
 					const expected = extractExpectedValue(stepText);
 					if (expected && !titleResult.includes(expected)) {
@@ -722,8 +745,8 @@ export class AIStepExecutor {
 				}
 			}
 
-			if (plan.isAssertion && action.method === 'innerText' && result !== undefined) {
-				const textResult = result instanceof Promise ? await result : result;
+			if (plan.isAssertion && action.method === 'innerText' && resolvedResult !== undefined) {
+				const textResult = resolvedResult;
 				if (typeof textResult === 'string') {
 					const expected = extractExpectedValue(stepText);
 					if (expected && !textResult.includes(expected)) {
@@ -780,6 +803,10 @@ function validatePlan(plan: ActionPlan): string | null {
 
 		if (!ALLOWED_METHODS.has(action.method as AllowedMethod)) {
 			return `Action ${i} uses disallowed method "${action.method}". Allowed: ${[...ALLOWED_METHODS].join(', ')}`;
+		}
+
+		if (action.method === 'evaluate' && !plan.isAssertion) {
+			return `Action ${i} uses "evaluate", which is only allowed for assertion steps`;
 		}
 
 		if (!Array.isArray(action.args)) {
@@ -932,7 +959,16 @@ export interface SimpleAIConfig {
  */
 export function createAIStepExecutorFromConfig(
 	aiConfig: SimpleAIConfig | null,
-	options?: { debug?: boolean; appContext?: string; cacheSize?: number },
+	options?: {
+		debug?: boolean;
+		appContext?: string;
+		cacheSize?: number;
+		cachePath?: string | null;
+		confidenceThreshold?: number;
+		cacheMode?: 'auto' | 'locked' | 'warm';
+		aiTimeout?: number;
+		actionTimeout?: number;
+	},
 ): AIStepExecutor | null {
 	if (!aiConfig) return null;
 
@@ -951,5 +987,10 @@ export function createAIStepExecutorFromConfig(
 		debug: options?.debug ?? false,
 		appContext: options?.appContext ?? '',
 		cacheSize: options?.cacheSize ?? 500,
+		cachePath: options?.cachePath,
+		confidenceThreshold: options?.confidenceThreshold,
+		cacheMode: options?.cacheMode,
+		aiTimeout: options?.aiTimeout,
+		actionTimeout: options?.actionTimeout,
 	});
 }

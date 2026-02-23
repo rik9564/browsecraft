@@ -11,6 +11,9 @@
 // ============================================================================
 
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
 	AIStepExecutor,
 	BddExecutor,
@@ -24,6 +27,13 @@ const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';
 let passed = 0;
 let failed = 0;
+
+function createTempCache(entries) {
+	const tempDir = mkdtempSync(join(tmpdir(), 'browsecraft-ai-step-'));
+	const cachePath = join(tempDir, 'ai-cache.json');
+	writeFileSync(cachePath, JSON.stringify(entries, null, 2), 'utf-8');
+	return { tempDir, cachePath };
+}
 
 function test(name, fn) {
 	try {
@@ -233,6 +243,22 @@ test('passes debug and appContext options through', () => {
 		{ debug: true, appContext: 'Test app' },
 	);
 	assert.ok(executor instanceof AIStepExecutor);
+});
+
+test('passes cache and timeout options through', () => {
+	const executor = createAIStepExecutorFromConfig(
+		{ provider: 'openai', apiKey: 'sk-test' },
+		{
+			cacheMode: 'locked',
+			cachePath: null,
+			confidenceThreshold: 0.95,
+			cacheSize: 42,
+			aiTimeout: 1234,
+			actionTimeout: 5678,
+		},
+	);
+	assert.ok(executor instanceof AIStepExecutor);
+	assert.equal(executor.mode, 'locked');
 });
 
 // =========================================================================
@@ -525,6 +551,158 @@ await testAsync('locked mode returns error for uncached step', async () => {
 		result.error.message.includes('no cached plan') ||
 			result.error.message.includes('No cached plan'),
 	);
+});
+
+await testAsync('locked mode does not call provider/network availability checks', async () => {
+	const stepText = 'I click "Submit"';
+	const cacheKey = stepText.trim().toLowerCase();
+	const { tempDir, cachePath } = createTempCache([
+		{
+			key: cacheKey,
+			plan: {
+				actions: [{ method: 'click', args: ['Submit'], description: 'Click submit' }],
+				isAssertion: false,
+				confidence: 1,
+				explanation: 'Click submit',
+			},
+		},
+	]);
+
+	const originalFetch = globalThis.fetch;
+	let fetchCalls = 0;
+	globalThis.fetch = () => {
+		fetchCalls++;
+		throw new Error('fetch should not be called in locked mode');
+	};
+
+	try {
+		const executor = createAIStepExecutor({
+			provider: {
+				provider: 'openai',
+				token: 'sk-test',
+				baseUrl: 'https://example.invalid',
+			},
+			cacheMode: 'locked',
+			cachePath,
+		});
+		const clicks = [];
+		const page = {
+			click: (target) => {
+				clicks.push(target);
+			},
+		};
+
+		const result = await executor.executeStep(stepText, 'When', page);
+		assert.equal(result.handled, true);
+		assert.equal(result.passed, true);
+		assert.equal(fetchCalls, 0);
+		assert.deepEqual(clicks, ['Submit']);
+	} finally {
+		globalThis.fetch = originalFetch;
+		rmSync(tempDir, { recursive: true, force: true });
+	}
+});
+
+await testAsync('enforces aiTimeout when provider call hangs', async () => {
+	const originalFetch = globalThis.fetch;
+	globalThis.fetch = () => new Promise(() => {});
+
+	try {
+		const executor = createAIStepExecutor({
+			provider: {
+				provider: 'openai',
+				token: 'sk-test',
+				baseUrl: 'https://example.invalid',
+			},
+			aiTimeout: 25,
+			cachePath: null,
+		});
+
+		// Bypass availability probe so the test exercises interpretStep timeout path.
+		executor.aiAvailable = true;
+
+		const start = Date.now();
+		const result = await executor.executeStep('I click "Submit"', 'When', {});
+		const elapsed = Date.now() - start;
+
+		assert.equal(result.handled, false);
+		assert.ok(result.error);
+		assert.ok(elapsed < 500, `Expected aiTimeout to trigger quickly, got ${elapsed}ms`);
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
+});
+
+await testAsync('rejects evaluate in non-assertion cached plans', async () => {
+	const stepText = 'I run a script';
+	const cacheKey = stepText.trim().toLowerCase();
+	const { tempDir, cachePath } = createTempCache([
+		{
+			key: cacheKey,
+			plan: {
+				actions: [{ method: 'evaluate', args: ['1 + 1'], description: 'Run JS' }],
+				isAssertion: false,
+				confidence: 1,
+				explanation: 'Run a script',
+			},
+		},
+	]);
+
+	try {
+		const executor = createAIStepExecutor({
+			cacheMode: 'locked',
+			cachePath,
+		});
+
+		const result = await executor.executeStep(stepText, 'When', {});
+		assert.equal(result.handled, true);
+		assert.equal(result.passed, false);
+		assert.ok(result.error);
+		assert.ok(result.error.message.includes('evaluate'));
+		assert.ok(result.error.message.includes('assertion'));
+	} finally {
+		rmSync(tempDir, { recursive: true, force: true });
+	}
+});
+
+await testAsync('enforces actionTimeout for long-running cached actions', async () => {
+	const stepText = 'I click "Submit"';
+	const cacheKey = stepText.trim().toLowerCase();
+	const { tempDir, cachePath } = createTempCache([
+		{
+			key: cacheKey,
+			plan: {
+				actions: [{ method: 'click', args: ['Submit'], description: 'Click submit' }],
+				isAssertion: false,
+				confidence: 1,
+				explanation: 'Click submit',
+			},
+		},
+	]);
+
+	try {
+		const executor = createAIStepExecutor({
+			cacheMode: 'locked',
+			cachePath,
+			actionTimeout: 25,
+		});
+
+		const page = {
+			click: () => new Promise(() => {}),
+		};
+
+		const start = Date.now();
+		const result = await executor.executeStep(stepText, 'When', page);
+		const elapsed = Date.now() - start;
+
+		assert.equal(result.handled, true);
+		assert.equal(result.passed, false);
+		assert.ok(result.error);
+		assert.ok(result.error.message.includes('Action timed out'));
+		assert.ok(elapsed < 500, `Expected action timeout to trigger quickly, got ${elapsed}ms`);
+	} finally {
+		rmSync(tempDir, { recursive: true, force: true });
+	}
 });
 
 test('full config with all new options', () => {

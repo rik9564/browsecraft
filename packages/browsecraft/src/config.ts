@@ -8,6 +8,7 @@ import type { BrowserName } from 'browsecraft-bidi';
 
 /** Execution strategy for multi-browser runs */
 export type ExecutionStrategy = 'parallel' | 'sequential' | 'matrix';
+export type BddAIStepsMode = 'off' | 'auto' | 'locked' | 'warm';
 
 /** Full configuration with all options */
 export interface BrowsecraftConfig {
@@ -78,6 +79,30 @@ export interface BddConfig {
 	steps?: string;
 	/** Whether to register the 38 built-in step definitions (default: true) */
 	builtInSteps?: boolean;
+	/**
+	 * Runtime AI step mode for undefined steps:
+	 * - 'off'    (default): disable runtime AI step interpretation
+	 * - 'auto'             : use cache and call AI for cache misses
+	 * - 'locked'           : cache only, never call AI (ideal for CI)
+	 * - 'warm'             : always call AI and refresh cache
+	 *
+	 * For convenience, boolean is also accepted:
+	 * - true  => 'auto'
+	 * - false => 'off'
+	 */
+	aiSteps?: BddAIStepsMode | boolean;
+	/** Runtime AI cache file path (default: '.browsecraft/ai-cache.json'). Set null to disable persistence. */
+	aiCachePath?: string | null;
+	/** Minimum confidence required before persisting an AI plan to disk (default: 0.8). */
+	aiConfidenceThreshold?: number;
+	/** Max in-memory runtime AI cache entries (default: 500). */
+	aiCacheSize?: number;
+	/** Runtime AI interpretation timeout in ms (default: 15000). */
+	aiTimeout?: number;
+	/** Runtime per-action execution timeout in ms (default: 30000). */
+	aiActionTimeout?: number;
+	/** App context hint passed to runtime AI for better interpretation. */
+	aiAppContext?: string;
 	/** Tag filter expression, e.g. "@smoke and not @wip" */
 	tagFilter?: string;
 	/** Only run scenarios whose name matches this string */

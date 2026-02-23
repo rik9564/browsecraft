@@ -17,7 +17,7 @@ import { pathToFileURL } from 'node:url';
 import type { BrowserName } from 'browsecraft-bidi';
 import { type RunnableTest, type RunnerOptions, TestRunner } from 'browsecraft-runner';
 import { Browser } from './browser.js';
-import { type UserConfig, resolveConfig } from './config.js';
+import { type BddAIStepsMode, type UserConfig, resolveAIConfig, resolveConfig } from './config.js';
 import { type TestCase, runAfterAllHooks, runTest, testRegistry } from './test.js';
 
 const VERSION = '0.3.0';
@@ -188,7 +188,15 @@ async function runBddTests(
 	filePatterns?: string[],
 ): Promise<void> {
 	const bddModule = (await import('browsecraft-bdd')) as BddModule;
-	const { parseGherkin, BddExecutor, registerBuiltInSteps, After, computeSummary } = bddModule;
+	const {
+		parseGherkin,
+		BddExecutor,
+		registerBuiltInSteps,
+		After,
+		computeSummary,
+		createAIStepExecutor,
+		createAIStepExecutorFromConfig,
+	} = bddModule;
 	const cwd = process.cwd();
 
 	// ── Resolve options from config + CLI flags ────────────────────────
@@ -196,6 +204,42 @@ async function runBddTests(
 	const featuresPattern = bddConfig.features ?? 'features/**/*.feature';
 	const stepsPattern = bddConfig.steps ?? 'steps/**/*.{ts,js,mts,mjs}';
 	const useBuiltInSteps = bddConfig.builtInSteps !== false;
+	const aiStepsMode = normalizeBddAiStepsMode(flags?.aiSteps ?? bddConfig.aiSteps);
+	const resolvedAIConfig = resolveAIConfig(config.ai);
+	const aiStepExecutor =
+		aiStepsMode === 'off'
+			? null
+			: resolvedAIConfig
+				? createAIStepExecutorFromConfig(resolvedAIConfig, {
+						debug: config.debug,
+						appContext: bddConfig.aiAppContext ?? config.baseURL,
+						cacheSize: bddConfig.aiCacheSize,
+						cachePath: bddConfig.aiCachePath,
+						confidenceThreshold: bddConfig.aiConfidenceThreshold,
+						cacheMode: aiStepsMode,
+						aiTimeout: bddConfig.aiTimeout,
+						actionTimeout: bddConfig.aiActionTimeout,
+					})
+				: aiStepsMode === 'locked'
+					? createAIStepExecutor({
+							enabled: true,
+							debug: config.debug,
+							appContext: bddConfig.aiAppContext ?? config.baseURL,
+							cacheSize: bddConfig.aiCacheSize,
+							cachePath: bddConfig.aiCachePath,
+							confidenceThreshold: bddConfig.aiConfidenceThreshold,
+							cacheMode: 'locked',
+							aiTimeout: bddConfig.aiTimeout,
+							actionTimeout: bddConfig.aiActionTimeout,
+						})
+					: null;
+
+	if (aiStepsMode !== 'off' && !aiStepExecutor) {
+		console.warn(
+			'  [browsecraft] BDD runtime AI steps are enabled, but no AI provider is configured. ' +
+				'Set ai in browsecraft.config.ts (or env vars) or use bdd.aiSteps = "locked" with a pre-warmed cache.',
+		);
+	}
 
 	// Browsers: --browser chrome,firefox  or  config.browsers  or  [config.browser]
 	const browserNames: string[] = flags?.browser
@@ -315,6 +359,7 @@ async function runBddTests(
 	if (isParallel) parts.push(`(${workers} workers)`);
 	if (tagFilter) parts.push(`[tags: ${tagFilter}]`);
 	if (grepPattern) parts.push(`[grep: ${grepPattern}]`);
+	if (aiStepsMode !== 'off') parts.push(`[ai-steps: ${aiStepsMode}]`);
 	if (targetLines.size > 0) {
 		const lineDescs = [...targetLines.entries()].map(
 			([f, ls]) => `${relative(cwd, f)}:${ls.join(',')}`,
@@ -360,17 +405,16 @@ async function runBddTests(
 				tagFilter: tagFilter ?? undefined,
 				grep: grepPattern ?? undefined,
 				scenarioFilter: lineFilter ?? undefined,
+				aiStepExecutor: aiStepExecutor ?? undefined,
 				failFast,
 				worldFactory: async () => {
-					const context = await browser.newContext();
-					const page = await context.newPage();
+					const page = await browser.newPage();
 					return {
 						page,
 						browser,
 						ctx: {},
 						attach: () => {},
 						log: (msg: string) => console.log(`      ${prefix}${msg}`),
-						_context: context,
 					};
 				},
 				onFeatureStart: (feature) => {
@@ -988,6 +1032,24 @@ interface CLIFlags {
 	strategy?: string;
 	/** BDD scenario name filter (alias for --grep in BDD mode) */
 	scenario?: string;
+	/** Runtime AI mode for undefined BDD steps */
+	aiSteps?: BddAIStepsMode;
+}
+
+function normalizeBddAiStepsMode(
+	mode: BddAIStepsMode | boolean | string | undefined,
+): BddAIStepsMode {
+	if (mode === true) return 'auto';
+	if (mode === false || mode === undefined) return 'off';
+	switch (mode) {
+		case 'off':
+		case 'auto':
+		case 'locked':
+		case 'warm':
+			return mode;
+		default:
+			return 'off';
+	}
 }
 
 function parseFlags(args: string[]): CLIFlags {
@@ -1037,6 +1099,11 @@ function parseFlags(args: string[]): CLIFlags {
 			case '--scenario':
 				flags.scenario = args[++i];
 				break;
+			case '--ai-steps': {
+				const raw = normalizeBddAiStepsMode(args[++i] ?? 'off');
+				flags.aiSteps = raw;
+				break;
+			}
 		}
 	}
 
@@ -1076,6 +1143,7 @@ function printHelp() {
     --grep <pattern>    Only run tests/scenarios matching pattern
     --scenario <name>   Run only scenarios whose name contains <name>
     --tag <expr>        BDD tag filter: "@smoke", "@smoke and not @wip"
+    --ai-steps <mode>   Runtime AI mode for undefined BDD steps: off|auto|locked|warm
     --strategy <s>      Multi-browser strategy: parallel, sequential, matrix
     --bail              Stop after first failure
     --debug             Enable verbose debug logging
@@ -1090,6 +1158,8 @@ function printHelp() {
     browsecraft test --bdd features/login.feature           # Equivalent long form
     browsecraft test --bdd --scenario "Valid login"         # Specific scenario by name
     browsecraft test --bdd --tag "@smoke"                   # Tag filter
+    browsecraft test --bdd --ai-steps auto                  # AI fallback for undefined steps
+    browsecraft test --bdd --ai-steps locked                # Cache-only AI (CI-friendly)
     browsecraft test --bdd --grep "checkout"                # Name filter
     browsecraft test --bdd --workers 4                      # 4 features in parallel
     browsecraft test --bdd --browser chrome,firefox         # Multi-browser

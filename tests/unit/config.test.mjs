@@ -369,6 +369,37 @@ test('BddConfig defaults are optional', () => {
 	assert.equal(cfg.bdd.tagFilter, undefined);
 	assert.equal(cfg.bdd.grep, undefined);
 	assert.equal(cfg.bdd.builtInSteps, undefined);
+	assert.equal(cfg.bdd.aiSteps, undefined);
+	assert.equal(cfg.bdd.aiCachePath, undefined);
+});
+
+test('BddConfig supports runtime AI step mode', () => {
+	const cfg = resolveConfig({
+		bdd: { aiSteps: 'locked' },
+	});
+	assert.equal(cfg.bdd.aiSteps, 'locked');
+});
+
+test('BddConfig supports runtime AI tuning options', () => {
+	const cfg = resolveConfig({
+		bdd: {
+			aiSteps: 'warm',
+			aiCachePath: '.browsecraft/runtime-ai-cache.json',
+			aiConfidenceThreshold: 0.9,
+			aiCacheSize: 250,
+			aiTimeout: 12000,
+			aiActionTimeout: 45000,
+			aiAppContext: 'Checkout app',
+		},
+	});
+
+	assert.equal(cfg.bdd.aiSteps, 'warm');
+	assert.equal(cfg.bdd.aiCachePath, '.browsecraft/runtime-ai-cache.json');
+	assert.equal(cfg.bdd.aiConfidenceThreshold, 0.9);
+	assert.equal(cfg.bdd.aiCacheSize, 250);
+	assert.equal(cfg.bdd.aiTimeout, 12000);
+	assert.equal(cfg.bdd.aiActionTimeout, 45000);
+	assert.equal(cfg.bdd.aiAppContext, 'Checkout app');
 });
 
 test('browsers config supports array of browser names', () => {

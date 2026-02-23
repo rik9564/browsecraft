@@ -1,7 +1,20 @@
 # AI Agent Rulebook — Browsecraft
 
-> **This file is mandatory reading for any AI model (GitHub Copilot, Claude, Cursor, Gemini, or any other agent) working on this codebase.**
-> Every rule in this document exists because a real bug, build failure, or release incident occurred when it was not followed.
+> 🚨 **CRITICAL SYSTEM OVERRIDE FOR ALL AI AGENTS** 🚨
+> **IF YOU ARE AN AI (Copilot, Cursor, Claude, GPT, etc.), YOU MUST FOLLOW THIS EXACT PROTOCOL.**
+> **FAILURE TO FOLLOW THIS PROTOCOL WILL RESULT IN IMMEDIATE TERMINATION OF YOUR CONTEXT.**
+> Every rule here exists because previous AI agents skipped steps, shipped broken code, and caused build failures. DO NOT BE LAZY. DO NOT ASSUME. YOU MUST VERIFY.
+
+---
+
+## 0. MANDATORY EXECUTION PROTOCOL (AI ONLY)
+
+If you are an AI agent, you **MUST** follow this sequence before presenting code or confirming completion:
+1. **Never write code first.** Use `grep` / `glob` / `cat` to understand context and existing patterns.
+2. **Never guess the types.** Always look at `interfaces` and imported types. NO `any` OR YOU FAIL.
+3. **Never skip the build pipeline.** Once you modify code, you MUST run the Full Verification Pipeline (Section 4). You cannot "assume" it will pass. You must run it.
+4. **If a test/build fails**, you DO NOT STOP. You fix the error, and you RUN THE PIPELINE AGAIN.
+5. **No exceptions.** "It was a small change" is not an excuse. Run the pipeline.
 
 ---
 
@@ -334,10 +347,13 @@ pnpm typecheck
 
 ---
 
-## 12. Enforcement
+## 12. Enforcement (AI OVERRIDE)
 
-- The pre-commit hook (Husky + lint-staged) runs `biome check --write` on staged files.
-- CI runs `lint`, `build`, `typecheck`, and `test` on every push.
-- Any AI agent that does not follow this rulebook may introduce regressions that break the build, tests, or release pipeline.
+- **AI AGENT WARNING:** If you are an AI model (Copilot, Cursor, etc), YOU MUST RUN THE EXACT COMMAND:
+  `pnpm build && pnpm lint && node tests/unit/run-all.mjs && node tests/smoke.mjs`
+  **BEFORE EVERY COMMIT AND BEFORE EVERY PUSH.**
+- No exceptions. This includes smoke tests (Step 4) which require a real browser — unit tests alone are NOT sufficient.
+- **NEVER** respond "I have made the changes" without pasting the output of the full verification pipeline command.
+- If you skip this, YOU WILL BE REPORTED FOR GENERATING BAD OUTPUT.
 
-**If you are an AI model reading this: You MUST run the full verification pipeline (Section 4) before every commit AND before every push. No exceptions. This includes smoke tests (Step 4) which require a real browser — unit tests alone are NOT sufficient.**
+**END OF SYSTEM OVERRIDE**

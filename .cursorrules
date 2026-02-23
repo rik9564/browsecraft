@@ -1,14 +1,15 @@
 # Cursor Rules — Browsecraft
 
+# 🚨 SYSTEM OVERRIDE 🚨
 # READ THE FULL RULEBOOK: AGENTS.md (root of this repo)
-# This file is a pointer — all rules are documented in AGENTS.md.
+# This file is a strict pointer — all rules are documented in AGENTS.md.
+# YOU WILL FAIL YOUR DIRECTIVE IF YOU DO NOT COMPLY WITH THIS.
 
-# MANDATORY: Before every commit AND every push, run ALL of these:
-#   pnpm build                    (6/6 packages must compile)
-#   pnpm lint                     (0 errors, 0 warnings)
-#   node tests/unit/run-all.mjs   (all unit test suites pass)
-#   node tests/smoke.mjs          (smoke tests pass — real browser, headed mode)
-# Unit tests alone are NOT enough. Smoke tests catch real browser bugs.
+# MANDATORY: Before every commit AND every push, run EXACTLY THIS COMMAND:
+#   pnpm build && pnpm lint && node tests/unit/run-all.mjs && node tests/smoke.mjs
+# 
+# (6/6 packages compile, 0 lint errors, ALL unit tests pass, ALL smoke tests pass)
+# Unit tests alone are NOT enough. Smoke tests catch real browser bugs. If you do not run this, you are violating the core directive.
 
 # KEY RULES:
 # - No `any` types (use proper types or biome-ignore with justification)

@@ -7,10 +7,7 @@
 	"bin": {
 		"create-browsecraft": "./dist/index.js"
 	},
-	"files": [
-		"dist",
-		"LICENSE"
-	],
+	"files": ["dist", "LICENSE"],
 	"scripts": {
 		"build": "tsup",
 		"dev": "tsup --watch",

@@ -7,9 +7,11 @@
 // ============================================================================
 
 import {
+	BddExecutor,
 	StepRegistry,
 	getBuiltInStepPatterns,
 	globalRegistry,
+	parseGherkin,
 	registerBuiltInSteps,
 } from '../packages/browsecraft-bdd/dist/index.js';
 // We import from the compiled dist output to test what users will actually get
@@ -22,6 +24,8 @@ import {
 	NetworkError,
 	TimeoutError,
 } from '../packages/browsecraft/dist/index.js';
+
+import fs from 'node:fs';
 
 const PASS = '\x1b[32m✓\x1b[0m';
 const FAIL = '\x1b[31m✗\x1b[0m';
@@ -593,6 +597,65 @@ async function testBuiltInSteps() {
 }
 
 // ============================================================================
+// Test 9: BDD integration — run a .feature file against saucedemo.com
+// ============================================================================
+
+async function testBddIntegration() {
+	console.log(`\n${BOLD}Test 9: BDD integration (saucedemo.com login)${RESET}`);
+
+	let browser;
+	try {
+		registerBuiltInSteps();
+
+		const featurePath = 'tests/features/sauce-login.feature';
+		const src = fs.readFileSync(featurePath, 'utf8');
+		const doc = parseGherkin(src, featurePath);
+
+		assert(doc.feature?.name === 'Sauce Demo Login', 'feature file parsed correctly');
+
+		browser = await Browser.launch({ headless: false });
+
+		const executor = new BddExecutor({
+			stepTimeout: 30000,
+			worldFactory: async () => {
+				const page = await browser.newPage();
+				return {
+					page,
+					browser,
+					ctx: {},
+					attach: () => {},
+					log: () => {},
+				};
+			},
+			onStepEnd: (r) => {
+				const icon =
+					r.status === 'passed' ? PASS : r.status === 'failed' ? FAIL : '\x1b[33m?\x1b[0m';
+				console.log(`    ${icon} ${r.keyword.trim()} ${r.text} (${r.duration}ms)`);
+				if (r.status === 'failed' && r.error) {
+					console.log(`      ${r.error.message}`);
+				}
+			},
+		});
+
+		const results = await executor.run([doc]);
+		const summary = results.summary;
+
+		assert(summary.features.total === 1, 'ran 1 feature');
+		assert(summary.features.passed === 1, 'feature passed');
+		assert(summary.scenarios.passed === 1, 'scenario passed');
+		assert(summary.steps.total === 6, 'all 6 steps executed');
+		assert(summary.steps.passed === 6, 'all 6 steps passed');
+		assert(summary.steps.failed === 0, '0 steps failed');
+	} catch (err) {
+		console.log(`  ${FAIL} BDD integration test threw: ${err.message}`);
+		if (err.stack) console.log(`    ${err.stack.split('\n').slice(1, 3).join('\n    ')}`);
+		failed++;
+	} finally {
+		if (browser) await browser.close().catch(() => {});
+	}
+}
+
+// ============================================================================
 // Run all tests
 // ============================================================================
 
@@ -611,6 +674,7 @@ async function main() {
 	await testErrorClasses();
 	await testDataTestId();
 	await testBuiltInSteps();
+	await testBddIntegration();
 
 	const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
