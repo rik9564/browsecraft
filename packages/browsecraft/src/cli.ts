@@ -17,7 +17,7 @@ import { Browser } from './browser.js';
 import { type UserConfig, resolveConfig } from './config.js';
 import { type TestCase, runAfterAllHooks, runTest, testRegistry } from './test.js';
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 
 async function main() {
 	const args = process.argv.slice(2);
@@ -164,7 +164,7 @@ async function runBddTests(
 	userConfig?: UserConfig,
 ): Promise<void> {
 	const bddModule = (await import('browsecraft-bdd')) as typeof import('browsecraft-bdd');
-	const { parseGherkin, BddExecutor, registerBuiltInSteps } = bddModule;
+	const { parseGherkin, BddExecutor, registerBuiltInSteps, After } = bddModule;
 	const cwd = process.cwd();
 
 	// Resolve BDD config from user config
@@ -196,6 +196,14 @@ async function runBddTests(
 		const fileUrl = pathToFileURL(stepFile).href;
 		await import(fileUrl);
 	}
+
+	// Step 3b: Register an After hook to clean up browser contexts per scenario
+	After(async ({ world }) => {
+		const w = world as any;
+		if (w?._context) {
+			await w._context.close().catch(() => {});
+		}
+	});
 
 	// Step 4: Parse .feature files into GherkinDocuments
 	const documents = featureFiles.map((file) => {
@@ -259,11 +267,7 @@ async function runBddTests(
 				console.log('        Step not defined. Add it to your step definitions.');
 			}
 		},
-		onScenarioEnd: async (result) => {
-			// Clean up browser context after each scenario
-			const world = result as any;
-			// Context cleanup is handled by the afterScenario hook below
-		},
+		onScenarioEnd: () => {},
 	});
 
 	// Step 7: Run features
