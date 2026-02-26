@@ -613,7 +613,7 @@ async function testBddIntegration() {
 
 		assert(doc.feature?.name === 'Sauce Demo Login', 'feature file parsed correctly');
 
-    browser = await Browser.launch({ headless: true });
+		browser = await Browser.launch({ headless: true });
 
 		const executor = new BddExecutor({
 			stepTimeout: 30000,
