@@ -68,6 +68,7 @@ async function testBiDiSession() {
 			browser: 'chrome',
 			headless: true,
 			timeout: 30_000,
+			args: ['--ignore-certificate-errors'],
 		});
 		assert(true, 'BiDiSession.launch() succeeded');
 		assert(session.isConnected, 'Session is connected');
@@ -149,6 +150,7 @@ async function testBrowserAPI() {
 		browser = await Browser.launch({
 			browser: 'chrome',
 			headless: true,
+			args: ['--ignore-certificate-errors'],
 		});
 		assert(true, 'Browser.launch() succeeded');
 		assert(browser.isConnected, 'Browser is connected');
@@ -224,6 +226,7 @@ async function testMultiplePages() {
 		browser = await Browser.launch({
 			browser: 'chrome',
 			headless: true,
+			args: ['--ignore-certificate-errors'],
 		});
 
 		// Create two pages
@@ -274,7 +277,7 @@ async function testEvaluate() {
 
 	let browser;
 	try {
-		browser = await Browser.launch({ headless: true });
+		browser = await Browser.launch({ headless: true, args: ['--ignore-certificate-errors'] });
 		const page = await browser.newPage();
 		await page.goto('https://example.com');
 
@@ -325,7 +328,7 @@ async function testEnglishAliases() {
 
 	let browser;
 	try {
-		browser = await Browser.launch({ headless: true });
+		browser = await Browser.launch({ headless: true, args: ['--ignore-certificate-errors'] });
 		const page = await browser.newPage();
 
 		// page.go() should work like page.goto()
@@ -474,7 +477,7 @@ async function testDataTestId() {
 
 	let browser;
 	try {
-		browser = await Browser.launch({ headless: true });
+		browser = await Browser.launch({ headless: true, args: ['--ignore-certificate-errors'] });
 		const page = await browser.newPage();
 
 		// Navigate to a page and inject elements with data-testid
@@ -613,7 +616,7 @@ async function testBddIntegration() {
 
 		assert(doc.feature?.name === 'Sauce Demo Login', 'feature file parsed correctly');
 
-		browser = await Browser.launch({ headless: false });
+		browser = await Browser.launch({ headless: true, args: ['--ignore-certificate-errors'] });
 
 		const executor = new BddExecutor({
 			stepTimeout: 30000,
