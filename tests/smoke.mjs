@@ -64,7 +64,8 @@ async function testBiDiSession() {
 
 	let session;
 	try {
-		session = await BiDiSession.launch({ headless: true, ignoreHTTPSErrors: true,
+		session = await BiDiSession.launch({
+			ignoreHTTPSErrors: true,
 			browser: 'chrome',
 			headless: true,
 			timeout: 30_000,
@@ -146,7 +147,8 @@ async function testBrowserAPI() {
 
 	let browser;
 	try {
-		browser = await Browser.launch({ headless: true, ignoreHTTPSErrors: true,
+		browser = await Browser.launch({
+			ignoreHTTPSErrors: true,
 			browser: 'chrome',
 			headless: true,
 		});
@@ -221,7 +223,8 @@ async function testMultiplePages() {
 
 	let browser;
 	try {
-		browser = await Browser.launch({ headless: true, ignoreHTTPSErrors: true,
+		browser = await Browser.launch({
+			ignoreHTTPSErrors: true,
 			browser: 'chrome',
 			headless: true,
 		});
