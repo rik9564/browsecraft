@@ -137,15 +137,18 @@ export async function checkActionability(
 		enabled?: boolean;
 		/** Check that nothing obscures the element (default: false — expensive) */
 		notObscured?: boolean;
+		/** Whether to return full state (default: true). Set false during polling to skip expensive layout reads. */
+		returnState?: boolean;
 	} = {},
 ): Promise<ActionabilityResult> {
 	const doVisible = checks.visible !== false;
 	const doEnabled = checks.enabled !== false;
 	const doObscured = checks.notObscured === true;
+	const doReturnState = checks.returnState !== false;
 
 	try {
 		const result = await session.script.callFunction({
-			functionDeclaration: `function(el, doVisible, doEnabled, doObscured) {
+			functionDeclaration: `function(el, doVisible, doEnabled, doObscured, doReturnState) {
 				// Check if element is still in the DOM
 				if (!el.isConnected) {
 					return {
@@ -158,23 +161,8 @@ export async function checkActionability(
 				const style = window.getComputedStyle(el);
 				const rect = el.getBoundingClientRect();
 				const tagName = el.tagName || '';
-				const textPreview = (el.innerText || el.textContent || '').slice(0, 80).trim();
-				const classes = el.className || '';
-				const id = el.id || '';
 
-				const state = {
-					found: true,
-					tagName: tagName,
-					textPreview: textPreview,
-					classes: typeof classes === 'string' ? classes : '',
-					id: id,
-					boundingBox: {
-						x: Math.round(rect.x),
-						y: Math.round(rect.y),
-						width: Math.round(rect.width),
-						height: Math.round(rect.height)
-					}
-				};
+				const state = { found: true };
 
 				// Visibility check
 				if (doVisible) {
@@ -188,8 +176,10 @@ export async function checkActionability(
 
 					if (!isVisible) {
 						if (rect.width === 0 || rect.height === 0) {
+							if (doReturnState) populateState(el, rect, tagName, state);
 							return { actionable: false, reason: 'zero-size', state: state };
 						}
+						if (doReturnState) populateState(el, rect, tagName, state);
 						return { actionable: false, reason: 'not-visible', state: state };
 					}
 				}
@@ -202,6 +192,7 @@ export async function checkActionability(
 					state.enabled = !isDisabled;
 
 					if (isDisabled) {
+						if (doReturnState) populateState(el, rect, tagName, state);
 						return { actionable: false, reason: 'disabled', state: state };
 					}
 				}
@@ -218,6 +209,7 @@ export async function checkActionability(
 							+ (topEl.id ? '#' + topEl.id : '')
 							+ (topEl.className ? '.' + topEl.className.split(' ').join('.') : '')
 							+ '>';
+						if (doReturnState) populateState(el, rect, tagName, state);
 						return { actionable: false, reason: 'obscured', state: state };
 					}
 					state.obscured = false;
@@ -225,7 +217,30 @@ export async function checkActionability(
 
 				state.visible = true;
 				state.enabled = true;
+
+				// If we successfully made it here, the element is actionable.
+				// Always populate state upon success to prevent race conditions
+				// when calling scripts in the main engine later.
+				populateState(el, rect, tagName, state);
+
 				return { actionable: true, state: state };
+
+				function populateState(element, r, tag, s) {
+					const textPreview = (element.innerText || element.textContent || '').slice(0, 80).trim();
+					const classes = element.className || '';
+					const id = element.id || '';
+
+					s.tagName = tag;
+					s.textPreview = textPreview;
+					s.classes = typeof classes === 'string' ? classes : '';
+					s.id = id;
+					s.boundingBox = {
+						x: Math.round(r.x),
+						y: Math.round(r.y),
+						width: Math.round(r.width),
+						height: Math.round(r.height)
+					};
+				}
 			}`,
 			target: { context: contextId },
 			arguments: [
@@ -233,6 +248,7 @@ export async function checkActionability(
 				{ type: 'boolean', value: doVisible },
 				{ type: 'boolean', value: doEnabled },
 				{ type: 'boolean', value: doObscured },
+				{ type: 'boolean', value: doReturnState },
 			],
 			awaitPromise: false,
 		});
@@ -278,21 +294,33 @@ export async function waitForActionable(
 		return await waitFor(
 			`${description} to be actionable`,
 			async () => {
-				const result = await checkActionability(session, contextId, ref, checks);
+				const result = await checkActionability(session, contextId, ref, {
+					...checks,
+					returnState: false,
+				});
 				lastResult = result;
 				return result.actionable ? result : null;
 			},
 			options,
 		);
 	} catch {
-		// Return the last known state for error reporting
-		return (
-			lastResult ?? {
-				actionable: false,
-				reason: 'not-visible',
-				state: { found: true },
-			}
-		);
+		// Time out means the element never became actionable.
+		// Need to get the full state of why it failed for error reporting.
+		try {
+			return await checkActionability(session, contextId, ref, {
+				...checks,
+				returnState: true,
+			});
+		} catch {
+			// Return the last known state for error reporting if it fails
+			return (
+				lastResult ?? {
+					actionable: false,
+					reason: 'not-visible',
+					state: { found: true },
+				}
+			);
+		}
 	}
 }
 
