@@ -1,0 +1,3 @@
+## 2024-05-24 - Pre-compiled Regex over Array.some for String Matching
+**Learning:** For high-frequency string matching (e.g., sanitization of fast-firing socket payloads), `RegExp.test` with a pre-compiled regex is significantly faster than `Array.some(str.includes)` as it avoids object allocation, redundant traversal, and is heavily optimized in V8.
+**Action:** Use pre-compiled Regex instead of `Array.some` when doing substring/inclusion checks against a known list of strings in hot paths.
