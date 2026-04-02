@@ -188,7 +188,10 @@ export class Scheduler {
 
 		// Emit browser end events
 		for (const browser of browsers) {
-			let passed = 0, failed = 0, skipped = 0, duration = 0;
+			let passed = 0;
+			let failed = 0;
+			let skipped = 0;
+			let duration = 0;
 			for (const r of results) {
 				if (r.worker.browser === browser) {
 					if (r.status === 'passed') passed++;
@@ -234,7 +237,9 @@ export class Scheduler {
 			const results = await this.pool.executeOnBrowser(browser, items, executor);
 			allResults.push(...results);
 
-			let passed = 0, failed = 0, skipped = 0;
+			let passed = 0;
+			let failed = 0;
+			let skipped = 0;
 			for (const r of results) {
 				if (r.status === 'passed') passed++;
 				else if (r.status === 'failed') failed++;
@@ -288,7 +293,9 @@ export class Scheduler {
 
 			const results = await this.pool.executeOnBrowser(browser, browserItems, executor);
 
-			let passed = 0, failed = 0, skipped = 0;
+			let passed = 0;
+			let failed = 0;
+			let skipped = 0;
 			for (const r of results) {
 				if (r.status === 'passed') passed++;
 				else if (r.status === 'failed') failed++;
@@ -378,7 +385,10 @@ export class Scheduler {
 	): SchedulerResult {
 		const browserResults: BrowserResult[] = browsers.map((browser) => {
 			const results = [];
-			let passed = 0, failed = 0, skipped = 0, duration = 0;
+			let passed = 0;
+			let failed = 0;
+			let skipped = 0;
+			let duration = 0;
 
 			for (const r of allResults) {
 				if (r.worker.browser === browser) {
@@ -393,7 +403,9 @@ export class Scheduler {
 			return { browser, results, passed, failed, skipped, duration };
 		});
 
-		let totalPassed = 0, totalFailed = 0, totalSkipped = 0;
+		let totalPassed = 0;
+		let totalFailed = 0;
+		let totalSkipped = 0;
 		for (const r of allResults) {
 			if (r.status === 'passed') totalPassed++;
 			else if (r.status === 'failed') totalFailed++;
