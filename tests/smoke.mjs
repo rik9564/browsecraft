@@ -613,7 +613,8 @@ async function testBddIntegration() {
 
 		assert(doc.feature?.name === 'Sauce Demo Login', 'feature file parsed correctly');
 
-		browser = await Browser.launch({ headless: false });
+		// Explicitly launch headless to avoid CI failing due to missing X11 display (see memory context)
+		browser = await Browser.launch({ headless: true });
 
 		const executor = new BddExecutor({
 			stepTimeout: 30000,
