@@ -155,29 +155,38 @@ export class ResultAggregator {
 			crossBrowserInconsistent: inconsistent.length,
 		};
 
-		// Timing
-		const allDurations = allResults.filter((r) => r.status !== 'skipped').map((r) => r.duration);
+		// Timing and Notable Tests
+		// Performance Optimization: Calculate stats in a single pass (O(N))
+		// rather than using multiple array .filter(), .map() and .reduce() iterations
+		const allDurations: number[] = [];
+		const nonSkippedTests: WorkItemResult[] = [];
+		const failedTests: Array<{ title: string; error?: string; browser: BrowserName }> = [];
+
+		for (const r of allResults) {
+			if (r.status !== 'skipped') {
+				allDurations.push(r.duration);
+				nonSkippedTests.push(r);
+			}
+			if (r.status === 'failed') {
+				failedTests.push({
+					title: r.item.title,
+					error: r.error?.message,
+					browser: r.worker.browser,
+				});
+			}
+		}
+
 		const timing = this.computeTimingStats(allDurations);
 
-		// Notable tests
 		const flakyTests = flaky.map((r) => r.title);
 		const inconsistentTests = inconsistent.map((r) => r.title);
 
-		const slowestTests = [...allResults]
-			.filter((r) => r.status !== 'skipped')
+		const slowestTests = nonSkippedTests
 			.sort((a, b) => b.duration - a.duration)
 			.slice(0, 5)
 			.map((r) => ({
 				title: r.item.title,
 				duration: r.duration,
-				browser: r.worker.browser,
-			}));
-
-		const failedTests = allResults
-			.filter((r) => r.status === 'failed')
-			.map((r) => ({
-				title: r.item.title,
-				error: r.error?.message,
 				browser: r.worker.browser,
 			}));
 
