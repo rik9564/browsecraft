@@ -398,41 +398,44 @@ async function resolveLabelsToInputs(
 	contextId: string,
 	nodes: NodeRemoteValue[],
 ): Promise<NodeRemoteValue | null> {
-	for (const node of nodes) {
-		if (!node.sharedId) continue;
+	const validNodes = nodes.filter((n) => n.sharedId);
+	if (validNodes.length === 0) return null;
 
-		try {
-			// Check if this node is a <label> and if so, resolve its associated input
-			const result = await session.script.callFunction({
-				functionDeclaration: `function(el) {
-					// If the element is a <label> with a 'for' attribute, find the associated input
-					if (el.tagName === 'LABEL') {
+	try {
+		// Optimization: Batch process all nodes in a single browser round-trip
+		// This eliminates N+1 browser round-trips during label resolution
+		const result = await session.script.callFunction({
+			functionDeclaration: `function(...els) {
+				for (const el of els) {
+					if (el && el.tagName === 'LABEL') {
 						const forId = el.getAttribute('for');
 						if (forId) {
 							const input = document.getElementById(forId);
 							if (input) return input;
 						}
-						// Also check for implicit label association (input nested inside label)
 						const nested = el.querySelector('input, textarea, select');
 						if (nested) return nested;
 					}
-					return null;
-				}`,
-				target: { context: contextId },
-				arguments: [{ sharedId: node.sharedId, handle: node.handle }],
-				awaitPromise: false,
-				resultOwnership: 'root',
-			});
+				}
+				return null;
+			}`,
+			target: { context: contextId },
+			arguments: validNodes.map((node) => ({
+				sharedId: node.sharedId as string,
+				handle: node.handle,
+			})),
+			awaitPromise: false,
+			resultOwnership: 'root',
+		});
 
-			if (
-				result.type === 'success' &&
-				result.result?.type === 'node' &&
-				(result.result as NodeRemoteValue).sharedId
-			) {
-				return result.result as NodeRemoteValue;
-			}
-		} catch {}
-	}
+		if (
+			result.type === 'success' &&
+			result.result?.type === 'node' &&
+			(result.result as NodeRemoteValue).sharedId
+		) {
+			return result.result as NodeRemoteValue;
+		}
+	} catch {}
 
 	return null;
 }
