@@ -3,16 +3,10 @@
  * Handles both direct key matches and nested header/cookie structures.
  */
 
-const SENSITIVE_KEYS = [
-	'authorization',
-	'cookie',
-	'set-cookie',
-	'password',
-	'token',
-	'secret',
-	'session',
-	'auth',
-];
+// Performance optimization: Pre-compiled regex replaces Array.some(str.includes)
+// for high-frequency string matching on fast-firing socket payloads.
+// Note: 'cookie' naturally matches 'set-cookie', so 'set-cookie' is omitted.
+const SENSITIVE_PATTERN = /(?:authorization|cookie|password|token|secret|session|auth)/i;
 const REDACTED_VALUE = '[REDACTED]';
 
 /**
@@ -41,7 +35,7 @@ export function sanitize(obj: unknown): unknown {
 		}
 
 		// 2. Direct key match (e.g., { password: "..." })
-		if (SENSITIVE_KEYS.some((k) => lowerKey.includes(k))) {
+		if (SENSITIVE_PATTERN.test(key)) {
 			result[key] = REDACTED_VALUE;
 			continue;
 		}
@@ -51,7 +45,7 @@ export function sanitize(obj: unknown): unknown {
 		if (
 			lowerKey === 'value' &&
 			typeof record.name === 'string' &&
-			SENSITIVE_KEYS.some((k) => (record.name as string).toLowerCase().includes(k))
+			SENSITIVE_PATTERN.test(record.name)
 		) {
 			if (typeof value === 'object' && value !== null && 'value' in (value as object)) {
 				// Handle BiDi RemoteValue-like structures: { type: "string", value: "..." }
