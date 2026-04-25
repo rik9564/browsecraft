@@ -66,7 +66,7 @@ async function testBiDiSession() {
 	try {
 		session = await BiDiSession.launch({
 			browser: 'chrome',
-			headless: false,
+			headless: true,
 			timeout: 30_000,
 		});
 		assert(true, 'BiDiSession.launch() succeeded');
@@ -148,7 +148,7 @@ async function testBrowserAPI() {
 	try {
 		browser = await Browser.launch({
 			browser: 'chrome',
-			headless: false,
+			headless: true,
 		});
 		assert(true, 'Browser.launch() succeeded');
 		assert(browser.isConnected, 'Browser is connected');
@@ -223,7 +223,7 @@ async function testMultiplePages() {
 	try {
 		browser = await Browser.launch({
 			browser: 'chrome',
-			headless: false,
+			headless: true,
 		});
 
 		// Create two pages
@@ -274,7 +274,7 @@ async function testEvaluate() {
 
 	let browser;
 	try {
-		browser = await Browser.launch({ headless: false });
+		browser = await Browser.launch({ headless: true });
 		const page = await browser.newPage();
 		await page.goto('https://example.com');
 
@@ -325,7 +325,7 @@ async function testEnglishAliases() {
 
 	let browser;
 	try {
-		browser = await Browser.launch({ headless: false });
+		browser = await Browser.launch({ headless: true });
 		const page = await browser.newPage();
 
 		// page.go() should work like page.goto()
@@ -474,7 +474,7 @@ async function testDataTestId() {
 
 	let browser;
 	try {
-		browser = await Browser.launch({ headless: false });
+		browser = await Browser.launch({ headless: true });
 		const page = await browser.newPage();
 
 		// Navigate to a page and inject elements with data-testid
@@ -613,7 +613,7 @@ async function testBddIntegration() {
 
 		assert(doc.feature?.name === 'Sauce Demo Login', 'feature file parsed correctly');
 
-		browser = await Browser.launch({ headless: false });
+		browser = await Browser.launch({ headless: true });
 
 		const executor = new BddExecutor({
 			stepTimeout: 30000,
