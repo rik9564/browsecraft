@@ -239,21 +239,11 @@ export class TestRunner {
 	}
 
 	private summarize(results: TestResult[], totalDuration: number): RunSummary {
-		let passed = 0;
-		let failed = 0;
-		let skipped = 0;
-
-		for (const r of results) {
-			if (r.status === 'passed') passed++;
-			else if (r.status === 'failed') failed++;
-			else if (r.status === 'skipped') skipped++;
-		}
-
 		return {
 			total: results.length,
-			passed,
-			failed,
-			skipped,
+			passed: results.filter((r) => r.status === 'passed').length,
+			failed: results.filter((r) => r.status === 'failed').length,
+			skipped: results.filter((r) => r.status === 'skipped').length,
 			duration: totalDuration,
 			results,
 		};

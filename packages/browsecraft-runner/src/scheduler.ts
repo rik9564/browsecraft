@@ -189,13 +189,12 @@ export class Scheduler {
 		// Emit browser end events
 		for (const browser of browsers) {
 			const browserResults = results.filter((r) => r.worker.browser === browser);
-			const stats = calculateStats(browserResults);
 			this.bus.emit('browser:end', {
 				browser,
-				passed: stats.passed,
-				failed: stats.failed,
-				skipped: stats.skipped,
-				duration: stats.duration,
+				passed: browserResults.filter((r) => r.status === 'passed').length,
+				failed: browserResults.filter((r) => r.status === 'failed').length,
+				skipped: browserResults.filter((r) => r.status === 'skipped').length,
+				duration: browserResults.reduce((sum, r) => sum + r.duration, 0),
 			});
 		}
 
@@ -226,12 +225,11 @@ export class Scheduler {
 			const results = await this.pool.executeOnBrowser(browser, items, executor);
 			allResults.push(...results);
 
-			const stats = calculateStats(results);
 			this.bus.emit('browser:end', {
 				browser,
-				passed: stats.passed,
-				failed: stats.failed,
-				skipped: stats.skipped,
+				passed: results.filter((r) => r.status === 'passed').length,
+				failed: results.filter((r) => r.status === 'failed').length,
+				skipped: results.filter((r) => r.status === 'skipped').length,
 				duration: Date.now() - browserStart,
 			});
 		}
@@ -274,12 +272,11 @@ export class Scheduler {
 
 			const results = await this.pool.executeOnBrowser(browser, browserItems, executor);
 
-			const stats = calculateStats(results);
 			this.bus.emit('browser:end', {
 				browser,
-				passed: stats.passed,
-				failed: stats.failed,
-				skipped: stats.skipped,
+				passed: results.filter((r) => r.status === 'passed').length,
+				failed: results.filter((r) => r.status === 'failed').length,
+				skipped: results.filter((r) => r.status === 'skipped').length,
 				duration: Date.now() - browserStart,
 			});
 
@@ -356,56 +353,26 @@ export class Scheduler {
 		browsers: BrowserName[],
 		totalDuration: number,
 	): SchedulerResult {
-		let totalPassed = 0;
-		let totalFailed = 0;
-		let totalSkipped = 0;
-
 		const browserResults: BrowserResult[] = browsers.map((browser) => {
 			const results = allResults.filter((r) => r.worker.browser === browser);
-			const stats = calculateStats(results);
-
-			totalPassed += stats.passed;
-			totalFailed += stats.failed;
-			totalSkipped += stats.skipped;
-
 			return {
 				browser,
 				results,
-				passed: stats.passed,
-				failed: stats.failed,
-				skipped: stats.skipped,
-				duration: stats.duration,
+				passed: results.filter((r) => r.status === 'passed').length,
+				failed: results.filter((r) => r.status === 'failed').length,
+				skipped: results.filter((r) => r.status === 'skipped').length,
+				duration: results.reduce((sum, r) => sum + r.duration, 0),
 			};
 		});
 
 		return {
 			browsers: browserResults,
 			allResults,
-			totalPassed,
-			totalFailed,
-			totalSkipped,
+			totalPassed: allResults.filter((r) => r.status === 'passed').length,
+			totalFailed: allResults.filter((r) => r.status === 'failed').length,
+			totalSkipped: allResults.filter((r) => r.status === 'skipped').length,
 			totalDuration,
 			strategy: this.config.strategy,
 		};
 	}
-}
-
-/**
- * Helper to calculate stats in a single pass (O(N)) to prevent redundant
- * Array.filter().length and Array.reduce() traversals on the same data set.
- */
-function calculateStats(results: WorkItemResult[]) {
-	let passed = 0;
-	let failed = 0;
-	let skipped = 0;
-	let duration = 0;
-
-	for (const r of results) {
-		if (r.status === 'passed') passed++;
-		else if (r.status === 'failed') failed++;
-		else if (r.status === 'skipped') skipped++;
-		duration += r.duration;
-	}
-
-	return { passed, failed, skipped, duration };
 }

@@ -1,3 +1,3 @@
-## 2025-05-18 - Avoid N+1 array iterations for stat calculations
-**Learning:** Found multiple places where `Array.filter().length` and `Array.reduce()` were used sequentially on the same dataset to count statuses (passed, failed, skipped) and total durations. This results in N+1 traversals and unnecessary array allocations.
-**Action:** Replace sequential filter/reduce chains with a single O(N) `for...of` loop tracking multiple counts and sums concurrently.
+## 2025-05-18 - Optimize fast-firing string matching with pre-compiled RegExp
+**Learning:** Found string sanitization of high-frequency BiDi socket payloads using `Array.some((k) => string.includes(k))`. This causes unnecessary array traversal and object allocation, becoming a measurable bottleneck when processing large volumes of messages.
+**Action:** Replace `Array.some(includes)` with a pre-compiled `RegExp.test` for O(1) matching against multiple alternatives.
