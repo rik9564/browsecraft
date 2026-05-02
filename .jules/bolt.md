@@ -1,0 +1,3 @@
+## 2025-05-18 - Avoid N+1 array iterations for stat calculations
+**Learning:** Found multiple places where `Array.filter().length` and `Array.reduce()` were used sequentially on the same dataset to count statuses (passed, failed, skipped) and total durations. This results in N+1 traversals and unnecessary array allocations.
+**Action:** Replace sequential filter/reduce chains with a single O(N) `for...of` loop tracking multiple counts and sums concurrently.
