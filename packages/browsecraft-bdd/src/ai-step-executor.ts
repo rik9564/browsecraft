@@ -458,8 +458,9 @@ export class AIStepExecutor {
 		this.diskCacheLoaded = true;
 
 		try {
-			const { readFileSync } = await import('node:fs');
-			const raw = readFileSync(this.cachePath, 'utf-8');
+			// Using async I/O to avoid blocking the event loop
+			const { readFile } = await import('node:fs/promises');
+			const raw = await readFile(this.cachePath, 'utf-8');
 			const entries = JSON.parse(raw) as Array<{ key: string; plan: ActionPlan }>;
 
 			if (Array.isArray(entries)) {
@@ -484,11 +485,12 @@ export class AIStepExecutor {
 		if (!this.cachePath) return;
 
 		try {
-			const { mkdirSync, writeFileSync } = await import('node:fs');
+			// Using async I/O to avoid blocking the event loop
+			const { mkdir, writeFile } = await import('node:fs/promises');
 			const { dirname } = await import('node:path');
 
 			// Ensure directory exists
-			mkdirSync(dirname(this.cachePath), { recursive: true });
+			await mkdir(dirname(this.cachePath), { recursive: true });
 
 			// Serialize the cache — only plans that meet confidence threshold
 			const entries: Array<{ key: string; plan: ActionPlan }> = [];
@@ -499,7 +501,7 @@ export class AIStepExecutor {
 				}
 			}
 
-			writeFileSync(this.cachePath, JSON.stringify(entries, null, 2), 'utf-8');
+			await writeFile(this.cachePath, JSON.stringify(entries, null, 2), 'utf-8');
 
 			if (this.debugMode) {
 				console.log(`  [AI] Saved ${entries.length} plans to ${this.cachePath}`);
