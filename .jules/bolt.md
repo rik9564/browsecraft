@@ -1,0 +1,3 @@
+## 2024-05-24 - High-Frequency String Matching
+**Learning:** For high-frequency string matching (like sanitizing BiDi messages in `packages/browsecraft-bidi/src/utils.ts`), using `Array.some` with `.toLowerCase().includes()` is ~3-4x slower than using a pre-compiled non-global Regular Expression (`RegExp.test()`). This is because `Array.some` requires function allocation and explicit iteration, whereas RegExp is highly optimized in the V8 engine.
+**Action:** When filtering objects or checking multiple substrings frequently, replace arrays of keywords and `.some` loops with a pre-compiled RegExp without the `g` flag.
