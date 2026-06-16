@@ -39,7 +39,9 @@ jobs:
         run: pnpm turbo run typecheck
 
       - name: Run smoke tests
-        run: node tests/smoke.mjs
+        run: |
+          sed -i 's/headless: false/headless: true/g' tests/smoke.mjs
+          node tests/smoke.mjs
 
   publish:
     needs: ci
