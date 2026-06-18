@@ -1,0 +1,3 @@
+## 2025-06-18 - RegExp.test outperforms Array.some for high-frequency string matching
+**Learning:** Using `Array.some(keyword => target.includes(keyword))` for string matching is significantly slower than using a pre-compiled, non-global regular expression (`RegExp.test()`) because it avoids array iteration and string allocations inside the loop. The `packages/browsecraft-bidi/src/utils.ts` `sanitize` utility handles every single message from the browser, so high-frequency string matches are a performance bottleneck.
+**Action:** Replace `Array.some(keyword => target.includes(keyword))` with `RegExp.test()` in high-frequency data paths where fixed substrings are checked.
