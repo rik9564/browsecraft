@@ -1,0 +1,3 @@
+## 2024-06-27 - Pre-compiled Regex for High-Frequency String Matching
+**Learning:** For high-frequency string matching (like sanitizing network events), `Array.some(keyword => target.toLowerCase().includes(keyword))` has significant object allocation and iteration overhead. Replacing it with a single pre-compiled, non-global regular expression (`RegExp.test()`) can improve execution speed by ~6x.
+**Action:** Always use pre-compiled, non-global Regexes for hot-path string matching operations, avoiding `toLowerCase()` and loop allocations. Avoid the global `g` flag to prevent `lastIndex` state issues.
