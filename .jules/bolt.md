@@ -1,0 +1,3 @@
+## 2024-07-01 - Optimizing high-frequency string matching in sanitize utility
+**Learning:** Using `Array.some(keyword => target.toLowerCase().includes(keyword))` for high-frequency string matching (like in network event sanitization) is computationally expensive due to object allocation (creating closures, intermediate lowercased strings) and array iteration overhead.
+**Action:** Replace `Array.some()` checks with a single pre-compiled, non-global regular expression (`RegExp.test()`) for ~3x-6x performance improvement when doing substring checks against a known list of keywords. Ensure the `g` flag is omitted to prevent `lastIndex` state issues.
