@@ -2,9 +2,10 @@
 // Browsecraft BiDi - BiDi over CDP
 // For Chrome/Edge: connects via CDP, runs the chromium-bidi mapper in-process
 // to translate BiDi <-> CDP. Firefox connects directly (native BiDi).
+//
+// Uses Node's built-in `WebSocket` global (stable since Node 22) for the CDP
+// connection -- no external WebSocket client dependency needed.
 // ============================================================================
-
-import { WebSocket } from 'ws';
 
 /**
  * Result of setting up BiDi over CDP.
@@ -44,13 +45,13 @@ export async function connectBidiOverCdp(
 			() => reject(new Error(`CDP connection timed out: ${cdpWsEndpoint}`)),
 			30_000,
 		);
-		ws.on('open', () => {
+		ws.addEventListener('open', () => {
 			clearTimeout(timer);
 			resolve();
 		});
-		ws.on('error', (err) => {
+		ws.addEventListener('error', () => {
 			clearTimeout(timer);
-			reject(new Error(`CDP WebSocket error: ${err.message}`));
+			reject(new Error(`CDP WebSocket error connecting to ${cdpWsEndpoint}`));
 		});
 	});
 
@@ -84,8 +85,8 @@ export async function connectBidiOverCdp(
 	};
 
 	// Wire up WebSocket messages to the CDP transport
-	ws.on('message', (data: Buffer) => {
-		const message = data.toString('utf-8');
+	ws.addEventListener('message', (event: MessageEvent) => {
+		const message = typeof event.data === 'string' ? event.data : String(event.data);
 		cdpOnMessage?.(message);
 	});
 

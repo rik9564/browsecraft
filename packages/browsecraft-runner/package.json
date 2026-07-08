@@ -45,6 +45,6 @@
 		"url": "https://github.com/rik9564/browsecraft/issues"
 	},
 	"engines": {
-		"node": ">=20.0.0"
+		"node": ">=22.0.0"
 	}
 }

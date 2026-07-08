@@ -61,7 +61,7 @@ pnpm create browsecraft
 yarn create browsecraft
 ```
 
-Requires Node.js 20+ and Chrome, Edge, or Firefox installed on your machine.
+Requires Node.js 22+ and Chrome, Edge, or Firefox installed on your machine.
 
 ## Run Your Tests
 

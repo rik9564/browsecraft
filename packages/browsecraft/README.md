@@ -27,7 +27,7 @@ No CSS selectors. No XPath. Just tell it what you see on the page.
 npm install browsecraft
 ```
 
-Requires Node.js 20+ and Chrome, Edge, or Firefox installed on your machine.
+Requires Node.js 22+ and Chrome, Edge, or Firefox installed on your machine.
 
 ## Quick Start
 

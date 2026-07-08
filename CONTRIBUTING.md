@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Browsecraft! This guide will help
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) >= 20.0.0
+- [Node.js](https://nodejs.org/) >= 22.0.0
 - [pnpm](https://pnpm.io/) 9.x (managed via `packageManager` field)
 - Google Chrome (for running tests)
 

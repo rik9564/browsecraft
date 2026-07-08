@@ -4,9 +4,11 @@
 // Supports two modes:
 //   1. Direct WebSocket (Firefox native BiDi)
 //   2. In-memory callback (Chrome/Edge via chromium-bidi mapper)
+//
+// Uses Node's built-in, spec-compliant `WebSocket` global (stable since
+// Node 22) -- no external WebSocket client dependency needed.
 // ============================================================================
 
-import { WebSocket } from 'ws';
 import type { BiDiCommand, BiDiEvent, BiDiMessage } from './types.js';
 import { BiDiError } from './types.js';
 
@@ -87,26 +89,26 @@ export class Transport {
 
 			this.ws = new WebSocket(url);
 
-			this.ws.on('open', () => {
+			this.ws.addEventListener('open', () => {
 				clearTimeout(timer);
 				this.connected = true;
 				resolve();
 			});
 
-			this.ws.on('message', (data: Buffer) => {
-				const raw = data.toString('utf-8');
+			this.ws.addEventListener('message', (event: MessageEvent) => {
+				const raw = typeof event.data === 'string' ? event.data : String(event.data);
 				this.onRawMessage?.('receive', raw);
 				this.handleMessage(raw);
 			});
 
-			this.ws.on('error', (err: Error) => {
+			this.ws.addEventListener('error', () => {
 				clearTimeout(timer);
 				if (!this.connected) {
-					reject(new BiDiError('session not created', `WebSocket error: ${err.message}`));
+					reject(new BiDiError('session not created', `WebSocket error connecting to ${url}`));
 				}
 			});
 
-			this.ws.on('close', (code: number, reason: Buffer) => {
+			this.ws.addEventListener('close', (event: CloseEvent) => {
 				clearTimeout(timer);
 				const wasConnected = this.connected;
 				this.connected = false;
@@ -121,12 +123,12 @@ export class Transport {
 				this.pending.clear();
 
 				if (wasConnected) {
-					this.onDisconnect?.(reason.toString('utf-8') || `code ${code}`);
+					this.onDisconnect?.(event.reason || `code ${event.code}`);
 				} else {
 					reject(
 						new BiDiError(
 							'session not created',
-							`WebSocket closed before connection established (code: ${code})`,
+							`WebSocket closed before connection established (code: ${event.code})`,
 						),
 					);
 				}
@@ -298,7 +300,7 @@ export class Transport {
 				return;
 			}
 
-			this.ws.on('close', () => {
+			this.ws.addEventListener('close', () => {
 				resolve();
 			});
 

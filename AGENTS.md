@@ -10,7 +10,7 @@
 ## 0. MANDATORY EXECUTION PROTOCOL (AI ONLY)
 
 If you are an AI agent, you **MUST** follow this sequence before presenting code or confirming completion:
-1. **Never write code first.** Use `grep` / `glob` / `cat` to understand context and existing patterns.
+1. **Never write code first.** Refer to the codebase map in `graphiphy.md` first to locate key modules and signatures. Use `grep` / `glob` / `cat` only for localized code details to minimize token consumption and avoid context bloating.
 2. **Never guess the types.** Always look at `interfaces` and imported types. NO `any` OR YOU FAIL.
 3. **Never skip the build pipeline.** Once you modify code, you MUST run the Full Verification Pipeline (Section 4). You cannot "assume" it will pass. You must run it.
 4. **If a test/build fails**, you DO NOT STOP. You fix the error, and you RUN THE PIPELINE AGAIN.
@@ -29,7 +29,7 @@ If you are an AI agent, you **MUST** follow this sequence before presenting code
 | Item | Value |
 |---|---|
 | Language | TypeScript (strict mode, ES2022 target) |
-| Runtime | Node.js >= 20 |
+| Runtime | Node.js >= 22 |
 | Package Manager | pnpm 9.x (`corepack enable && corepack prepare`) |
 | Monorepo Tool | Turborepo |
 | Linter/Formatter | Biome 1.9+ |

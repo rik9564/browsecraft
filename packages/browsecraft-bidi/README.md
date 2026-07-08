@@ -12,7 +12,7 @@ Most users should install [`browsecraft`](https://www.npmjs.com/package/browsecr
 npm install browsecraft-bidi
 ```
 
-Requires Node.js 20+ and Chrome, Edge, or Firefox installed on your machine.
+Requires Node.js 22+ and Chrome, Edge, or Firefox installed on your machine.
 
 ## Usage
 

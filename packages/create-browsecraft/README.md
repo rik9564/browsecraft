@@ -46,7 +46,7 @@ yarn create browsecraft
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 22+
 - Chrome, Edge, or Firefox installed on your machine
 
 ## What Gets Created
