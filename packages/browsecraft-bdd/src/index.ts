@@ -153,3 +153,19 @@ export {
 	type PageAction,
 	type SimpleAIConfig,
 } from './ai-step-executor.js';
+
+// ---------------------------------------------------------------------------
+// Studio Reporter (structured JSON events for Browsecraft Studio)
+// ---------------------------------------------------------------------------
+export {
+	StudioReporter,
+	STUDIO_EVENT_MARKER,
+	type StudioEvent,
+	type StudioFeatureStartEvent,
+	type StudioFeatureEndEvent,
+	type StudioScenarioStartEvent,
+	type StudioScenarioEndEvent,
+	type StudioStepStartEvent,
+	type StudioStepEndEvent,
+	type StudioRunEndEvent,
+} from './reporter.js';
