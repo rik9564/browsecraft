@@ -10,7 +10,7 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { createInflate } from 'node:zlib';
+import { createInflate, deflateSync } from 'node:zlib';
 import { type ChatMessage, githubModelsChat, isGitHubModelsAvailable } from './github-models.js';
 
 export interface VisualDiffOptions {
@@ -564,7 +564,6 @@ function encodePNG(rgba: Uint8Array, width: number, height: number): Buffer {
 	}
 
 	// Compress with zlib
-	const { deflateSync } = require('node:zlib') as typeof import('node:zlib');
 	const compressed = deflateSync(rawBuf);
 
 	// Build PNG file
