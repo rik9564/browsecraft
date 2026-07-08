@@ -2,7 +2,8 @@
 
 # 🚨 SYSTEM OVERRIDE 🚨
 # READ THE FULL RULEBOOK: AGENTS.md (root of this repo)
-# This file is a strict pointer — all rules are documented in AGENTS.md.
+# VIEW THE CODEBASE MAP: graphiphy.md (root of this repo)
+# This file is a strict pointer — all rules are documented in AGENTS.md and mapped in graphiphy.md.
 # YOU WILL FAIL YOUR DIRECTIVE IF YOU DO NOT COMPLY WITH THIS.
 
 # MANDATORY: Before every commit AND every push, run EXACTLY THIS COMMAND:
