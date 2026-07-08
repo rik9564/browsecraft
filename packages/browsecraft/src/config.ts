@@ -67,6 +67,15 @@ export interface BrowsecraftConfig {
 	ai: 'auto' | 'off' | AIConfig;
 	/** Enable verbose debug logging (default: false) */
 	debug: boolean;
+	/**
+	 * Record a step-by-step trace (action, target, screenshot) for each test:
+	 * - 'off':               no trace recorded (default)
+	 * - 'on':                always record and save a trace file
+	 * - 'retain-on-failure': record every run, but only save the file for failures
+	 *
+	 * View a saved trace with: `browsecraft show-trace <path>`
+	 */
+	trace: 'off' | 'on' | 'retain-on-failure';
 	/** BDD configuration for Gherkin feature files */
 	bdd?: BddConfig;
 }
@@ -195,6 +204,7 @@ const DEFAULTS: BrowsecraftConfig = {
 	outputDir: '.browsecraft',
 	ai: 'auto',
 	debug: false,
+	trace: 'off',
 };
 
 /**

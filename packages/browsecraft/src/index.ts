@@ -76,6 +76,11 @@ export type { StorageCookie } from 'browsecraft-bidi';
 // Locator types (for advanced usage)
 export type { ElementTarget, LocatorOptions } from './locator.js';
 
+// Trace recording (for reading trace files produced by config.trace)
+export { TraceRecorder } from './trace.js';
+export type { TraceBoundingBox, TraceFile, TraceStep } from './trace.js';
+export { renderTraceViewerHtml } from './trace-viewer.js';
+
 // ---------------------------------------------------------------------------
 // BDD — Built-in Behavior-Driven Development
 // ---------------------------------------------------------------------------
@@ -149,3 +154,16 @@ export type { AutoStepResult, AutoStepOptions, GeneratedStepDef } from 'browsecr
 
 // Built-in step definitions
 export { registerBuiltInSteps, getBuiltInStepPatterns } from 'browsecraft-bdd';
+
+// Studio Reporter (structured JSON events for Browsecraft Studio)
+export { StudioReporter, STUDIO_EVENT_MARKER } from 'browsecraft-bdd';
+export type {
+	StudioEvent,
+	StudioFeatureStartEvent,
+	StudioFeatureEndEvent,
+	StudioScenarioStartEvent,
+	StudioScenarioEndEvent,
+	StudioStepStartEvent,
+	StudioStepEndEvent,
+	StudioRunEndEvent,
+} from 'browsecraft-bdd';

@@ -7,6 +7,9 @@
 // expect(page.get('Cart')).toHaveText('3 items');
 // ============================================================================
 
+import { existsSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { ElementHandle, Page } from './page.js';
 import { waitFor } from './wait.js';
 
@@ -17,6 +20,38 @@ const DEFAULT_ASSERTION_TIMEOUT = 5_000;
 interface MatcherOptions {
 	/** Timeout in ms (default: 5000) */
 	timeout?: number;
+}
+
+/** Options for toMatchSnapshot() */
+interface SnapshotOptions {
+	/** Max % of differing pixels allowed before failing (default: 0.1) */
+	maxDiffPercent?: number;
+	/** Per-channel pixel diff threshold, 0-255 (default: 5) */
+	threshold?: number;
+	/**
+	 * Use an AI vision model for semantic comparison (ignores benign rendering
+	 * noise like timestamps/antialiasing) instead of strict pixel diffing.
+	 * Requires an AI provider to be configured. Default: false.
+	 */
+	semantic?: boolean;
+}
+
+/** Shape of the bits of browsecraft-ai used by toMatchSnapshot() */
+interface SnapshotCompareModule {
+	compareScreenshots: (
+		baseline: string | Buffer,
+		current: string | Buffer,
+		options?: {
+			threshold?: number;
+			maxDiffPercent?: number;
+			diffOutputPath?: string;
+			useAI?: boolean;
+		},
+	) => Promise<{
+		match: boolean;
+		diffPercent: number;
+		aiAnalysis?: { semanticMatch: boolean; description: string; model: string };
+	}>;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,6 +198,69 @@ class PageAssertions {
 			},
 			timeout,
 		);
+	}
+
+	/**
+	 * Compare the page against a stored visual baseline screenshot.
+	 *
+	 * On first run (no baseline saved yet), records the current screenshot as
+	 * the baseline and passes. Re-run with `BROWSECRAFT_UPDATE_SNAPSHOTS=1` to
+	 * intentionally update a baseline after a real UI change.
+	 *
+	 * ```ts
+	 * await expect(page).toMatchSnapshot('homepage');
+	 * await expect(page).toMatchSnapshot('homepage', { semantic: true });
+	 * ```
+	 */
+	async toMatchSnapshot(name: string, options?: SnapshotOptions): Promise<void> {
+		const config = this.page.getConfig();
+		const snapshotDir = join(config.outputDir, 'snapshots');
+		const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '_');
+		const baselinePath = join(snapshotDir, `${safeName}.png`);
+		const diffPath = join(snapshotDir, `${safeName}.diff.png`);
+
+		await mkdir(snapshotDir, { recursive: true });
+		const current = await this.page.screenshot();
+
+		if (process.env.BROWSECRAFT_UPDATE_SNAPSHOTS === '1' || !existsSync(baselinePath)) {
+			await writeFile(baselinePath, current);
+			console.log(`  \x1b[32msnapshot saved\x1b[0m ${name} → ${baselinePath}`);
+			return;
+		}
+
+		// browsecraft-ai ships as a bundled dependency, so this should always resolve.
+		// The catch only guards against a broken/corrupted install.
+		const aiPkg = 'browsecraft-ai';
+		let compareScreenshots: SnapshotCompareModule['compareScreenshots'];
+		try {
+			({ compareScreenshots } = (await import(aiPkg)) as SnapshotCompareModule);
+		} catch {
+			throw new AssertionError(
+				'Could not load browsecraft-ai. Try reinstalling: npm install browsecraft',
+			);
+		}
+
+		const result = await compareScreenshots(baselinePath, current, {
+			maxDiffPercent: options?.maxDiffPercent,
+			threshold: options?.threshold,
+			useAI: options?.semantic ?? false,
+			diffOutputPath: diffPath,
+		});
+
+		if (options?.semantic && !result.aiAnalysis && !result.match) {
+			console.warn(
+				'  ⚠ semantic: true requested but no AI provider is configured — fell back to pixel diff. ' +
+					'Set GITHUB_TOKEN to enable AI-assisted comparison.',
+			);
+		}
+
+		if (!result.match) {
+			const aiNote = result.aiAnalysis ? ` (AI: ${result.aiAnalysis.description})` : '';
+			throw new AssertionError(
+				`Screenshot "${name}" does not match baseline: ${result.diffPercent.toFixed(2)}% of pixels differ${aiNote}. ` +
+					`Diff saved to ${diffPath}. Run with BROWSECRAFT_UPDATE_SNAPSHOTS=1 to update the baseline.`,
+			);
+		}
 	}
 }
 

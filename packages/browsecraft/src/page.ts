@@ -26,6 +26,7 @@ import {
 	locateAllElements,
 	locateElement,
 } from './locator.js';
+import { type TraceBoundingBox, TraceRecorder, type TraceStep } from './trace.js';
 import {
 	type ActionabilityResult,
 	type WaitOptions,
@@ -102,11 +103,21 @@ export class Page {
 	private timingMultiplier = 1.0;
 	/** @internal -- whether timing has been calibrated */
 	private timingCalibrated = false;
+	/** @internal -- records action steps when config.trace !== 'off' */
+	private readonly traceRecorder?: TraceRecorder;
 
 	constructor(session: BiDiSession, contextId: string, config: BrowsecraftConfig) {
 		this.session = session;
 		this.contextId = contextId;
 		this.config = config;
+		if (config.trace !== 'off') {
+			this.traceRecorder = new TraceRecorder(true);
+		}
+	}
+
+	/** @internal -- used by test.ts to save the trace file after a run */
+	getTraceSteps(): TraceStep[] {
+		return this.traceRecorder?.getSteps() ?? [];
 	}
 
 	// -----------------------------------------------------------------------
@@ -659,6 +670,11 @@ export class Page {
 		});
 
 		return Buffer.from(result.data, 'base64');
+	}
+
+	/** @internal -- used by expect(page).toMatchSnapshot() to resolve output/AI settings */
+	getConfig(): Readonly<BrowsecraftConfig> {
+		return this.config;
 	}
 
 	// -----------------------------------------------------------------------
@@ -1481,7 +1497,9 @@ export class Page {
 	): Promise<LocatedElement> {
 		const adaptedOptions = { timeout: this.adaptTimeout(options.timeout) };
 		try {
-			return await locateElement(this.session, this.contextId, target, adaptedOptions);
+			const located = await locateElement(this.session, this.contextId, target, adaptedOptions);
+			await this.recordTraceStep(action, target, located);
+			return located;
 		} catch (err) {
 			// Only attempt healing for ElementNotFoundError with CSS/testId selectors
 			if (!(err instanceof ElementNotFoundError)) throw err;
@@ -1520,12 +1538,14 @@ export class Page {
 					);
 
 					// Retry with the healed selector
-					return await locateElement(
+					const healedLocated = await locateElement(
 						this.session,
 						this.contextId,
 						{ selector: result.selector },
 						adaptedOptions,
 					);
+					await this.recordTraceStep(action, target, healedLocated);
+					return healedLocated;
 				}
 			} catch {
 				// Self-healing failed or browsecraft-ai not available — throw original error
@@ -1533,6 +1553,77 @@ export class Page {
 
 			throw err;
 		}
+	}
+
+	/**
+	 * Record a trace step for a successfully located element: a screenshot
+	 * plus the element's bounding box, so the viewer can highlight exactly
+	 * what was acted on. Best-effort -- tracing never breaks the action.
+	 */
+	private async recordTraceStep(
+		action: string,
+		target: ElementTarget,
+		located: LocatedElement,
+	): Promise<void> {
+		if (!this.traceRecorder) return;
+
+		const boundingBox = await this.getElementBoundingBox(located).catch(() => undefined);
+		const url = await this.url().catch(() => undefined);
+		await this.traceRecorder.record(
+			action,
+			describeTraceTarget(target),
+			() => this.screenshot(),
+			boundingBox,
+			url,
+			() => this.captureDomSnapshot(),
+		);
+	}
+
+	/**
+	 * Capture the live page's full HTML for offline DOM inspection in the
+	 * trace viewer. A `<base>` tag is injected so relative resource URLs
+	 * (images, CSS) still resolve against the original page when the
+	 * snapshot is opened later, as long as that site is still reachable.
+	 */
+	private async captureDomSnapshot(): Promise<string> {
+		const [html, pageUrl] = await Promise.all([
+			this.evaluate<string>('document.documentElement.outerHTML'),
+			this.url(),
+		]);
+		const withBase = /<head[^>]*>/i.test(html)
+			? html.replace(/<head[^>]*>/i, (match) => `${match}<base href="${pageUrl}">`)
+			: `<head><base href="${pageUrl}"></head>${html}`;
+		return `<!doctype html>${withBase}`;
+	}
+
+	/** Get the viewport-relative bounding box of an already-located element */
+	private async getElementBoundingBox(
+		located: LocatedElement,
+	): Promise<TraceBoundingBox | undefined> {
+		const result = await this.session.script.callFunction({
+			functionDeclaration: `function(el) {
+				const rect = el.getBoundingClientRect();
+				return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+			}`,
+			target: { context: this.contextId },
+			arguments: [this.getSharedRef(located.node)],
+			awaitPromise: false,
+		});
+
+		if (result.type !== 'success' || result.result?.type !== 'object') return undefined;
+
+		const entries = result.result.value as unknown;
+		if (!Array.isArray(entries)) return undefined;
+
+		const map = new Map(entries as [string, { value: number }][]);
+		const extract = (key: string) => map.get(key)?.value ?? 0;
+
+		return {
+			x: extract('x'),
+			y: extract('y'),
+			width: extract('width'),
+			height: extract('height'),
+		};
 	}
 
 	/**
@@ -2217,6 +2308,17 @@ function mapKey(key: string): string {
 		Space: ' ',
 	};
 	return keyMap[key] ?? key;
+}
+
+/** Human-readable description of an action target, for trace recording */
+function describeTraceTarget(target: ElementTarget): string {
+	if (typeof target === 'string') return target;
+	if (target.selector) return target.selector;
+	if (target.testId) return `testId=${target.testId}`;
+	if (target.text) return `text="${target.text}"`;
+	if (target.label) return `label="${target.label}"`;
+	if (target.role) return `role=${target.role}`;
+	return JSON.stringify(target);
 }
 
 /** Parse "GET /api/users" or "/api/users" or "https://..." into method + urlPattern */

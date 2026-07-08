@@ -11,6 +11,7 @@
 // npx browsecraft --help            # Show help
 // ============================================================================
 
+import { exec } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -19,6 +20,8 @@ import { type RunnableTest, type RunnerOptions, TestRunner } from 'browsecraft-r
 import { Browser } from './browser.js';
 import { type BddAIStepsMode, type UserConfig, resolveAIConfig, resolveConfig } from './config.js';
 import { type TestCase, runAfterAllHooks, runTest, testRegistry } from './test.js';
+import { renderTraceViewerHtml } from './trace-viewer.js';
+import type { TraceFile } from './trace.js';
 
 // Read version dynamically so it stays in sync with package.json
 const VERSION: string = (() => {
@@ -59,6 +62,12 @@ async function main() {
 			break;
 		case 'setup-ide':
 			await setupIde();
+			break;
+		case 'generate':
+			await generateTestCommand(args.slice(1));
+			break;
+		case 'show-trace':
+			await showTraceCommand(args.slice(1));
 			break;
 		default:
 			// If no command, infer from file extension
@@ -148,13 +157,10 @@ async function runTests(args: string[]) {
 	let sharedBrowser: Browser | undefined;
 
 	try {
-		sharedBrowser = await Browser.launch({
-			browser: config.browser,
-			headless: config.headless,
-			executablePath: config.executablePath,
-			debug: config.debug,
-			timeout: config.timeout,
-		});
+		// Pass the full resolved config (not just the launch-related fields) so
+		// baseURL/trace/screenshot/ai are actually available on the pages this
+		// browser creates -- not just on the browser's own launch options.
+		sharedBrowser = await Browser.launch(config);
 	} catch (err) {
 		console.error(`Failed to launch browser: ${err instanceof Error ? err.message : String(err)}`);
 		process.exit(1);
@@ -162,7 +168,7 @@ async function runTests(args: string[]) {
 
 	// executeTest callback: runs a single test with fixture setup/teardown
 	const executeTest = async (test: RunnableTest) => {
-		return runTest(test as unknown as TestCase, sharedBrowser);
+		return runTest(test as unknown as TestCase, sharedBrowser, userConfig);
 	};
 
 	try {
@@ -204,6 +210,7 @@ async function runBddTests(
 		computeSummary,
 		createAIStepExecutor,
 		createAIStepExecutorFromConfig,
+		StudioReporter,
 	} = bddModule;
 	const cwd = process.cwd();
 
@@ -271,6 +278,10 @@ async function runBddTests(
 
 	// Fail fast: --bail
 	const failFast = flags?.bail ?? false;
+
+	// Reporter: --reporter studio  emits structured JSON events alongside text output
+	const useStudioReporter = flags?.reporter === 'studio';
+	const studioReporter = useStudioReporter ? new StudioReporter() : null;
 
 	// ── Step 1: Discover .feature files ────────────────────────────────
 	// Parse feature:line syntax (e.g. features/login.feature:15)
@@ -399,13 +410,12 @@ async function runBddTests(
 		docs: ReturnType<typeof parseGherkin>[],
 		prefix: string,
 	): Promise<{ features: FeatureResultType[]; duration: number; browser: Browser }> => {
-		const browser = await Browser.launch({
-			browser: browserName as BrowserName,
-			headless: config.headless,
-			executablePath: config.executablePath,
-			debug: config.debug,
-			timeout: config.timeout,
-		});
+		// Pass the full resolved config (not just the launch-related fields) so
+		// baseURL/trace/screenshot/ai are actually available on the pages this
+		// browser creates -- not just on the browser's own launch options.
+		const browser = await Browser.launch({ ...config, browser: browserName as BrowserName });
+
+		const reporterCallbacks = studioReporter ? studioReporter.callbacks() : null;
 
 		const createExecutor = (docSubset: ReturnType<typeof parseGherkin>[]) =>
 			new BddExecutor({
@@ -427,11 +437,19 @@ async function runBddTests(
 				},
 				onFeatureStart: (feature) => {
 					console.log(`\n  ${prefix}Feature: ${feature.name}`);
+					reporterCallbacks?.onFeatureStart(feature);
 				},
-				onScenarioStart: (scenario) => {
+				onFeatureEnd: (result) => {
+					reporterCallbacks?.onFeatureEnd(result);
+				},
+				onScenarioStart: (scenario, featureName) => {
 					console.log(`    ${prefix}Scenario: ${scenario.name}`);
+					reporterCallbacks?.onScenarioStart(scenario, featureName);
 				},
-				onStepEnd: (result) => {
+				onStepStart: (step, scenarioName) => {
+					reporterCallbacks?.onStepStart(step, scenarioName);
+				},
+				onStepEnd: (result, scenarioName) => {
 					const icon =
 						result.status === 'passed'
 							? '\x1b[32m+\x1b[0m'
@@ -451,8 +469,9 @@ async function runBddTests(
 					if (result.status === 'undefined') {
 						console.log(`        ${prefix}Step not defined. Add it to your step definitions.`);
 					}
+					reporterCallbacks?.onStepEnd(result, scenarioName);
 				},
-				onScenarioEnd: (result) => {
+				onScenarioEnd: (result, featureName) => {
 					// Print hookError when worldFactory or hooks fail (0 steps executed)
 					if (result.hookError) {
 						console.log(`      ${prefix}\x1b[31m✗ ${result.hookError.message}\x1b[0m`);
@@ -461,6 +480,7 @@ async function runBddTests(
 					if (result.status === 'failed' && !result.hookError && result.steps.length === 0) {
 						console.log(`      ${prefix}\x1b[31m✗ Scenario failed with no steps executed\x1b[0m`);
 					}
+					reporterCallbacks?.onScenarioEnd(result, featureName);
 				},
 			});
 
@@ -539,6 +559,16 @@ async function runBddTests(
 
 		// ── Print summary ──────────────────────────────────────────────
 		const summary = computeSummary(allFeatures);
+
+		// Emit a structured run-end event for Studio
+		if (studioReporter) {
+			studioReporter.onRunEnd({
+				features: allFeatures,
+				duration: totalDuration,
+				summary,
+			});
+		}
+
 		console.log('\n  ─────────────────────────────────────');
 
 		// Per-browser breakdown for multi-browser runs
@@ -767,6 +797,123 @@ test('can navigate to more info', async ({ page }) => {
 
 	console.log('\n  Setup complete! Run your first test:\n');
 	console.log('    npx browsecraft test\n');
+}
+
+// ---------------------------------------------------------------------------
+// Generate — turn a natural-language description into a test file (AI-assisted)
+// ---------------------------------------------------------------------------
+
+/** Shape of the bits of browsecraft-ai used by `browsecraft generate` */
+interface GenerateTestModule {
+	generateTest: (options: {
+		description: string;
+		url?: string;
+		token?: string;
+	}) => Promise<{ code: string; aiGenerated: boolean; model?: string; notes: string[] }>;
+}
+
+async function generateTestCommand(args: string[]): Promise<void> {
+	const description = args.find((a) => !a.startsWith('--'));
+	if (!description) {
+		console.error('Usage: browsecraft generate "<description>" [--url <url>] [--out <path>]');
+		process.exit(1);
+	}
+
+	let url: string | undefined;
+	let outPath: string | undefined;
+	for (let i = 0; i < args.length; i++) {
+		if (args[i] === '--url') url = args[++i];
+		if (args[i] === '--out') outPath = args[++i];
+	}
+
+	// browsecraft-ai ships as a bundled dependency, so this should always resolve.
+	// The catch only guards against a broken/corrupted install.
+	const aiPkg = 'browsecraft-ai';
+	let generateTest: GenerateTestModule['generateTest'];
+	try {
+		({ generateTest } = (await import(aiPkg)) as GenerateTestModule);
+	} catch {
+		console.error('Could not load browsecraft-ai. Try reinstalling: npm install browsecraft');
+		process.exit(1);
+		return;
+	}
+
+	const hasToken = Boolean(process.env.BROWSECRAFT_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN);
+	console.log(`\n  Generating test: "${description}"...`);
+	console.log(
+		hasToken
+			? '  Using AI generation (GitHub Models)...\n'
+			: '  No GITHUB_TOKEN found — generating a template test. Set GITHUB_TOKEN for AI-powered generation.\n',
+	);
+
+	const result = await generateTest({
+		description,
+		url,
+		token: process.env.GITHUB_TOKEN,
+	});
+
+	const filename =
+		outPath ??
+		`${description
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '-')
+			.replace(/(^-|-$)/g, '')
+			.slice(0, 60)}.test.ts`;
+
+	writeFileSync(filename, result.code, 'utf-8');
+
+	console.log(`  \x1b[32mcreated\x1b[0m ${filename}`);
+	console.log(
+		`  ${result.aiGenerated ? `AI-generated (model: ${result.model ?? 'unknown'})` : 'Template (no AI provider configured)'}`,
+	);
+	for (const note of result.notes) {
+		console.log(`  - ${note}`);
+	}
+	console.log(
+		`\n  Review the generated code before running it: npx browsecraft test ${filename}\n`,
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Show Trace — opens a recorded trace file in a self-contained HTML viewer
+// ---------------------------------------------------------------------------
+
+async function showTraceCommand(args: string[]): Promise<void> {
+	const tracePath = args[0];
+	if (!tracePath) {
+		console.error('Usage: browsecraft show-trace <path-to-trace.json>');
+		process.exit(1);
+		return;
+	}
+
+	if (!existsSync(tracePath)) {
+		console.error(`Trace file not found: ${tracePath}`);
+		process.exit(1);
+		return;
+	}
+
+	let trace: TraceFile;
+	try {
+		trace = JSON.parse(readFileSync(tracePath, 'utf-8')) as TraceFile;
+	} catch {
+		console.error(`Could not parse trace file as JSON: ${tracePath}`);
+		process.exit(1);
+		return;
+	}
+
+	const html = renderTraceViewerHtml(trace);
+	const htmlPath = `${tracePath.replace(/\.json$/, '')}.trace.html`;
+	writeFileSync(htmlPath, html, 'utf-8');
+
+	console.log(`\n  Trace viewer written to ${htmlPath}`);
+
+	const openCommand =
+		process.platform === 'win32' ? 'start ""' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+	exec(`${openCommand} "${htmlPath}"`, (err) => {
+		if (err) {
+			console.log(`  Open it manually in a browser: ${htmlPath}\n`);
+		}
+	});
 }
 
 // ---------------------------------------------------------------------------
@@ -1042,6 +1189,8 @@ interface CLIFlags {
 	scenario?: string;
 	/** Runtime AI mode for undefined BDD steps */
 	aiSteps?: BddAIStepsMode;
+	/** Reporter format: 'default' (ANSI text) or 'studio' (JSON events) */
+	reporter?: string;
 }
 
 function normalizeBddAiStepsMode(
@@ -1113,6 +1262,9 @@ function parseFlags(args: string[]): { flags: CLIFlags; positional: string[] } {
 				flags.aiSteps = raw;
 				break;
 			}
+			case '--reporter':
+				flags.reporter = args[++i];
+				break;
 			default:
 				// Not a known flag — treat as a positional argument (file path)
 				if (!arg.startsWith('--') && !arg.startsWith('-')) {
@@ -1139,6 +1291,8 @@ function printHelp() {
     browsecraft test --bdd [features...] [options]
     browsecraft init
     browsecraft setup-ide
+    browsecraft generate "<description>" [--url <url>] [--out <path>]
+    browsecraft show-trace <path-to-trace.json>
 
   Commands:
     test          Run browser tests
@@ -1146,6 +1300,8 @@ function printHelp() {
     test --bdd    Run BDD feature files (Gherkin)
     init          Create a new project with example config and test
     setup-ide     Configure VS Code for Cucumber step discovery
+    generate      Generate a test file from a plain-English description
+    show-trace    Open a recorded trace (see the "trace" config option) in a viewer
 
   Options:
     --bdd               Run BDD feature files instead of programmatic tests
@@ -1159,6 +1315,7 @@ function printHelp() {
     --scenario <name>   Run only scenarios whose name contains <name>
     --tag <expr>        BDD tag filter: "@smoke", "@smoke and not @wip"
     --ai-steps <mode>   Runtime AI mode for undefined BDD steps: off|auto|locked|warm
+    --reporter <name>   Output reporter: default (ANSI text) or studio (JSON events)
     --strategy <s>      Multi-browser strategy: parallel, sequential, matrix
     --bail              Stop after first failure
     --debug             Enable verbose debug logging
@@ -1187,6 +1344,8 @@ function printHelp() {
     browsecraft test --headed --browser firefox
     browsecraft test --grep "login" --bail
     browsecraft setup-ide                     # Auto-configure IDE for BDD
+    browsecraft generate "user can log in" --url https://example.com/login
+    browsecraft show-trace .browsecraft/traces/login-1699999999999.json
 `);
 }
 

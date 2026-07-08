@@ -329,6 +329,13 @@ export async function runTest(
 			);
 		}
 
+		let tracePath: string | undefined;
+		if (config.trace === 'on' && page) {
+			tracePath = await saveTrace(page, testCase, config.outputDir, 'passed').catch(
+				() => undefined,
+			);
+		}
+
 		const duration = Date.now() - startTime;
 		return {
 			title: testCase.title,
@@ -336,6 +343,7 @@ export async function runTest(
 			status: 'passed',
 			duration,
 			screenshotPath,
+			tracePath,
 		};
 	} catch (error) {
 		const duration = Date.now() - startTime;
@@ -348,6 +356,13 @@ export async function runTest(
 			);
 		}
 
+		let tracePath: string | undefined;
+		if ((config.trace === 'on' || config.trace === 'retain-on-failure') && page) {
+			tracePath = await saveTrace(page, testCase, config.outputDir, 'failed').catch(
+				() => undefined,
+			);
+		}
+
 		return {
 			title: testCase.title,
 			suitePath: testCase.suitePath,
@@ -355,6 +370,7 @@ export async function runTest(
 			duration,
 			error: error instanceof Error ? error : new Error(String(error)),
 			screenshotPath,
+			tracePath,
 		};
 	} finally {
 		// Clean up context (page is closed when context closes)
@@ -408,15 +424,7 @@ async function captureScreenshot(
 	testCase: TestCase,
 	outputDir: string,
 ): Promise<string> {
-	// Build a safe filename from suite path + test title
-	const parts = [...testCase.suitePath, testCase.title];
-	const safeName = parts
-		.join('-')
-		.replace(/[^a-zA-Z0-9_-]/g, '_')
-		.replace(/_+/g, '_')
-		.slice(0, 200);
-	const timestamp = Date.now();
-	const filename = `${safeName}-${timestamp}.png`;
+	const filename = `${safeTestName(testCase)}-${Date.now()}.png`;
 	const screenshotDir = join(outputDir, 'screenshots');
 
 	// Ensure directory exists
@@ -430,6 +438,39 @@ async function captureScreenshot(
 	return filePath;
 }
 
+/** Build a safe, deterministic filename base from a test's suite path + title */
+function safeTestName(testCase: TestCase): string {
+	return [...testCase.suitePath, testCase.title]
+		.join('-')
+		.replace(/[^a-zA-Z0-9_-]/g, '_')
+		.replace(/_+/g, '_')
+		.slice(0, 200);
+}
+
+/** Save the page's recorded trace steps to the output directory */
+async function saveTrace(
+	page: Page,
+	testCase: TestCase,
+	outputDir: string,
+	status: 'passed' | 'failed',
+): Promise<string> {
+	const steps = page.getTraceSteps();
+	const filename = `${safeTestName(testCase)}-${Date.now()}.json`;
+	const traceDir = join(outputDir, 'traces');
+
+	await mkdir(traceDir, { recursive: true });
+
+	const filePath = join(traceDir, filename);
+	const json = JSON.stringify(
+		{ title: testCase.title, suitePath: testCase.suitePath, status, steps },
+		null,
+		2,
+	);
+	await writeFile(filePath, json, 'utf-8');
+
+	return filePath;
+}
+
 /** Result of running a single test */
 export interface TestResult {
 	title: string;
@@ -439,4 +480,6 @@ export interface TestResult {
 	error?: Error;
 	/** Path to screenshot file (if captured on failure) */
 	screenshotPath?: string;
+	/** Path to trace file (if trace recording was enabled) */
+	tracePath?: string;
 }
