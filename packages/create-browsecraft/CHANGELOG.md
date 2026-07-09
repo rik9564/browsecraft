@@ -1,5 +1,11 @@
 # create-browsecraft
 
+## 0.7.0
+
+### Patch Changes
+
+- [`64e1d09`](https://github.com/rik9564/browsecraft/commit/64e1d0960e6a3eac6e40c99e39889da0bd8095f8) Thanks [@rik9564](https://github.com/rik9564)! - Drop the `ws` dependency in favor of Node's built-in, spec-compliant `WebSocket` global (stable since Node 22). This removes the last non-essential external runtime dependency from the BiDi transport layer. Requires Node.js >= 22.
+
 ## 0.6.3
 
 ## 0.6.2
