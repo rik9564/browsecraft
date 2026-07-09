@@ -1,0 +1,3 @@
+## 2024-06-03 - N+1 Array Iterations in Result Aggregation
+**Learning:** Found multiple instances where array items were being iterated over redundantly. Specifically, code used multiple `.filter(r => r.status === '...').length` and `.reduce(...)` statements to calculate statistics (passed, failed, skipped, duration). This creates O(N*M) operations where M is the number of stats.
+**Action:** Replace multiple `.filter()` and `.reduce()` operations over the same data array with a single `for...of` loop to compute all summary statistics in one pass (O(N)), avoiding redundant array allocations and traversals.
