@@ -70,12 +70,9 @@ jobs:
         run: pnpm turbo run typecheck
 
   build:
-    name: Build (Node ${{ matrix.node-version }})
+    name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      matrix:
-        node-version: [20, 22]
     steps:
       - uses: actions/checkout@v6
 
@@ -83,7 +80,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
