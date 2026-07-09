@@ -274,7 +274,7 @@ async function testEvaluate() {
 
 	let browser;
 	try {
-		browser = await Browser.launch({ headless: true });
+		browser = await Browser.launch({ headless: true, ignoreHTTPSErrors: true });
 		const page = await browser.newPage();
 		await page.goto('https://example.com');
 
@@ -325,7 +325,7 @@ async function testEnglishAliases() {
 
 	let browser;
 	try {
-		browser = await Browser.launch({ headless: true });
+		browser = await Browser.launch({ headless: true, ignoreHTTPSErrors: true });
 		const page = await browser.newPage();
 
 		// page.go() should work like page.goto()
@@ -613,7 +613,7 @@ async function testBddIntegration() {
 
 		assert(doc.feature?.name === 'Sauce Demo Login', 'feature file parsed correctly');
 
-		browser = await Browser.launch({ headless: false });
+		browser = await Browser.launch({ headless: true });
 
 		const executor = new BddExecutor({
 			stepTimeout: 30000,

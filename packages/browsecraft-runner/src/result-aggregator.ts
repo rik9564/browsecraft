@@ -163,21 +163,32 @@ export class ResultAggregator {
 		const flakyTests = flaky.map((r) => r.title);
 		const inconsistentTests = inconsistent.map((r) => r.title);
 
-		const slowestTests = [...allResults]
-			.filter((r) => r.status !== 'skipped')
+		const validResults: typeof allResults = [];
+		const failedTests: Array<{
+			title: string;
+			error?: string;
+			browser: import('./event-bus.js').BrowserName;
+		}> = [];
+		for (let i = 0; i < allResults.length; i++) {
+			const r = allResults[i]!;
+			if (r.status !== 'skipped') {
+				validResults.push(r);
+			}
+			if (r.status === 'failed') {
+				failedTests.push({
+					title: r.item.title,
+					error: r.error?.message,
+					browser: r.worker.browser,
+				});
+			}
+		}
+
+		const slowestTests = validResults
 			.sort((a, b) => b.duration - a.duration)
 			.slice(0, 5)
 			.map((r) => ({
 				title: r.item.title,
 				duration: r.duration,
-				browser: r.worker.browser,
-			}));
-
-		const failedTests = allResults
-			.filter((r) => r.status === 'failed')
-			.map((r) => ({
-				title: r.item.title,
-				error: r.error?.message,
 				browser: r.worker.browser,
 			}));
 
