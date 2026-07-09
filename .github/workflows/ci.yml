@@ -134,5 +134,8 @@ jobs:
       - name: Build all packages
         run: pnpm turbo run build
 
+      - name: Install Xvfb (for headed smoke tests)
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Run smoke tests
-        run: node tests/smoke.mjs
+        run: xvfb-run --auto-servernum node tests/smoke.mjs
