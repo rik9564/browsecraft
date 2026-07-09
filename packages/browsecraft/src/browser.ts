@@ -270,9 +270,10 @@ export class Browser {
 
 	/** Close the browser and clean up all resources. */
 	async close(): Promise<void> {
-		for (const page of this.pages) {
-			await page.close().catch(() => {});
-		}
+		// ⚡ Bolt: Parallelized page teardown. Replaced sequential await in for...of
+		// loop with Promise.all to close all pages concurrently, reducing total teardown
+		// time from O(n) to O(1) network round-trips.
+		await Promise.all(this.pages.map((page) => page.close().catch(() => {})));
 		this.pages = [];
 		await this.session.close();
 	}
@@ -303,13 +304,17 @@ export class Browser {
 		try {
 			const tree = await this.session.browsingContext.getTree();
 			const contexts = tree.contexts ?? [];
-			for (const ctx of contexts) {
+			// ⚡ Bolt: Mapped contexts to an array of close promises instead of awaiting
+			// sequentially to eliminate N+1 browser round-trips during isolated context cleanup.
+			const closePromises = contexts.map((ctx) => {
 				const alreadyTracked = this.pages.some((p) => p.contextId === ctx.context);
 				const isDefaultContext = !ctx.userContext || ctx.userContext === 'default';
 				if (!alreadyTracked && ctx.url === 'about:blank' && isDefaultContext) {
-					await this.session.browsingContext.close({ context: ctx.context }).catch(() => {});
+					return this.session.browsingContext.close({ context: ctx.context }).catch(() => {});
 				}
-			}
+				return Promise.resolve();
+			});
+			await Promise.all(closePromises);
 		} catch {
 			// getTree or close not supported — ignore
 		}
@@ -396,9 +401,8 @@ export class BrowserContext {
 
 	/** Close this context and all its pages. */
 	async close(): Promise<void> {
-		for (const page of this.pages) {
-			await page.close().catch(() => {});
-		}
+		// ⚡ Bolt: Parallelized isolated context teardown for O(1) concurrent cleanup.
+		await Promise.all(this.pages.map((page) => page.close().catch(() => {})));
 		this.pages = [];
 
 		if (this.userContext) {
