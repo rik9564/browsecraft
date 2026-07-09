@@ -201,6 +201,14 @@ AfterStep(async (ctx) => { /* after each step */ });
 Before('@login', async (ctx) => { /* only for @login scenarios */ });
 ```
 
+## Reporters
+
+`StudioReporter` emits structured JSON events for a BDD run instead of ANSI text, so external tooling can consume test progress/results programmatically.
+
+```bash
+npx browsecraft test --bdd --reporter studio
+```
+
 ## AI Auto-Step Generation
 
 Automatically generate step definitions from `.feature` files using the GitHub Models API.

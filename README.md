@@ -77,6 +77,8 @@ npx browsecraft test --bdd --tag "@smoke"             # Filter by tag
 npx browsecraft test --bdd --ai-steps auto            # AI fallback for undefined steps
 npx browsecraft test --bdd --ai-steps locked          # Cache-only AI (CI-friendly)
 npx browsecraft setup-ide              # Generate IDE config for step discovery
+npx browsecraft generate "user can log in" --url https://example.com/login  # Generate a test from a description
+npx browsecraft show-trace .browsecraft/traces/<file>.json                  # Open a recorded trace in the viewer
 ```
 
 ## Multi-Browser Parallel Execution
@@ -538,6 +540,12 @@ npx browsecraft test --bdd features/login.feature:15
 npx browsecraft test --bdd --scenario "login" --tag "@smoke"
 ```
 
+### Reporters
+
+```bash
+npx browsecraft test --bdd --reporter studio  # JSON events instead of ANSI text, for tooling to consume
+```
+
 Programmatically, use `grep` and `scenarioFilter` on `BddExecutor`:
 
 ```ts
@@ -676,6 +684,57 @@ Not all failures are equal. Browsecraft classifies each failure and only retries
 export default defineConfig({
   retries: 2,           // max retry attempts
   retryStrategy: 'smart', // 'smart' (default) | 'all' | 'none'
+});
+```
+
+## Traces & Debugging
+
+Record a step-by-step timeline of a test — screenshots, the element acted on, the page URL, and a full DOM snapshot — then replay it in an interactive viewer.
+
+```ts
+export default defineConfig({
+  trace: 'retain-on-failure', // 'off' (default) | 'on' | 'retain-on-failure'
+});
+```
+
+```bash
+npx browsecraft show-trace .browsecraft/traces/<test-name>-<timestamp>.json
+```
+
+This opens a self-contained HTML viewer (no server needed) with:
+
+- **Playback controls** — play/pause through every step like a video, with a Gantt-style color-coded timeline
+- **Animated cursor & highlight** — glides to and glows around exactly the element each action targeted
+- **Inspect DOM mode** — toggle from the screenshot to the real captured page in a sandboxed iframe, and hover/click elements to see their tag, id, classes, and text — not just a picture of them
+- **Fake browser chrome** — a live URL bar showing the page each step ran against
+
+Screenshots and DOM snapshots are embedded directly in the trace file, so the viewer works fully offline. External resources (images, fonts, CSS) on the captured page aren't bundled, so they only render if the original site is still reachable when you view the trace.
+
+## Generate Tests from Plain English
+
+```bash
+npx browsecraft generate "user can add an item to the cart" --url https://example.com/shop
+```
+
+Generates a runnable test file from a natural-language description, using AI when a provider is configured (falls back to a template with TODOs otherwise — see [AI Features](#ai-features-optional)). Always review the generated code before running it.
+
+## Visual Regression Testing
+
+```ts
+import { test, expect } from 'browsecraft';
+
+test('homepage looks right', async ({ page }) => {
+  await page.goto('/');
+  await expect(page).toMatchSnapshot('homepage');
+});
+```
+
+The first run saves a baseline screenshot; later runs diff against it and fail if the difference exceeds the threshold. Re-run with `BROWSECRAFT_UPDATE_SNAPSHOTS=1` to intentionally update a baseline after a real UI change.
+
+```ts
+await expect(page).toMatchSnapshot('homepage', {
+  maxDiffPercent: 1,  // allowed % of differing pixels (default: 0.1)
+  semantic: true,     // use an AI vision model to ignore benign rendering noise
 });
 ```
 

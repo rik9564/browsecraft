@@ -169,6 +169,36 @@ await page2.close();
 await browser.close();
 ```
 
+## Traces & Debugging
+
+```ts
+// browsecraft.config.ts
+export default defineConfig({
+  trace: 'retain-on-failure', // 'off' (default) | 'on' | 'retain-on-failure'
+});
+```
+
+```bash
+npx browsecraft show-trace .browsecraft/traces/<test-name>-<timestamp>.json
+```
+
+Opens a self-contained, offline HTML viewer with playback controls, a Gantt-style timeline, an animated cursor/highlight over the acted-on element, and a DOM inspection mode for hovering/clicking the real captured page — not just a screenshot.
+
+## Generate Tests from Plain English
+
+```bash
+npx browsecraft generate "user can log in" --url https://example.com/login
+```
+
+## Visual Regression Testing
+
+```js
+await expect(page).toMatchSnapshot('homepage');
+// { maxDiffPercent: 1, semantic: true } for AI-assisted comparison
+```
+
+First run records the baseline; later runs diff against it. Set `BROWSECRAFT_UPDATE_SNAPSHOTS=1` to update a baseline intentionally.
+
 ## BDD Testing
 
 Browsecraft has a built-in BDD framework. No Cucumber, no third-party dependencies — everything is custom-built.
