@@ -1,5 +1,29 @@
 # browsecraft
 
+## 0.7.0
+
+### Minor Changes
+
+- [`fcde5dc`](https://github.com/rik9564/browsecraft/commit/fcde5dc88dd6336982d1f2becd3b42a0635e505c) Thanks [@rik9564](https://github.com/rik9564)! - Add trace recording and an interactive trace viewer: `config.trace` records a step-by-step timeline (screenshots, bounding boxes, page URLs, and full DOM snapshots) for each test, and `browsecraft show-trace <path>` opens a self-contained HTML viewer with playback controls, a Gantt-style timeline, an animated cursor/highlight over the acted-on element, and a DOM inspection mode for hovering/inspecting the real captured page.
+
+  Also adds:
+
+  - `browsecraft generate "<description>"` — generate a test file from a plain-English description, backed by `browsecraft-ai`'s existing `generateTest()`.
+  - `expect(page).toMatchSnapshot(name)` — visual regression matcher backed by `browsecraft-ai`'s existing `compareScreenshots()`, with baseline auto-recording and optional AI-assisted semantic comparison.
+  - `browsecraft-ai` is now a bundled dependency of `browsecraft` (previously an optional peer requiring a separate install), so AI-assisted generation, self-healing, and snapshot diffing work out of the box.
+
+  Also fixes a bug where `browsecraft.config.ts` settings beyond browser-launch options (`baseURL`, `trace`, `screenshot`, `ai`, `retries`) were silently dropped by the CLI's test runner, because the resolved config was never passed through to `Browser.launch()` or `runTest()`.
+
+### Patch Changes
+
+- [`64e1d09`](https://github.com/rik9564/browsecraft/commit/64e1d0960e6a3eac6e40c99e39889da0bd8095f8) Thanks [@rik9564](https://github.com/rik9564)! - Drop the `ws` dependency in favor of Node's built-in, spec-compliant `WebSocket` global (stable since Node 22). This removes the last non-essential external runtime dependency from the BiDi transport layer. Requires Node.js >= 22.
+
+- Updated dependencies [[`d101310`](https://github.com/rik9564/browsecraft/commit/d10131087126ad85c99cf0b982b4c49992b093b1), [`fcde5dc`](https://github.com/rik9564/browsecraft/commit/fcde5dc88dd6336982d1f2becd3b42a0635e505c), [`64e1d09`](https://github.com/rik9564/browsecraft/commit/64e1d0960e6a3eac6e40c99e39889da0bd8095f8), [`bca605a`](https://github.com/rik9564/browsecraft/commit/bca605a0058c5ce98ede75c28de2a25788073878)]:
+  - browsecraft-bdd@0.7.0
+  - browsecraft-ai@0.7.0
+  - browsecraft-bidi@0.7.0
+  - browsecraft-runner@0.7.0
+
 ## 0.6.3
 
 ### Patch Changes

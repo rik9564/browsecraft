@@ -1,5 +1,18 @@
 # browsecraft-bdd
 
+## 0.7.0
+
+### Minor Changes
+
+- [`d101310`](https://github.com/rik9564/browsecraft/commit/d10131087126ad85c99cf0b982b4c49992b093b1) Thanks [@rik9564](https://github.com/rik9564)! - Add `StudioReporter`, a JSON-event reporter for BDD test runs, selectable via `browsecraft test --bdd --reporter studio`.
+
+### Patch Changes
+
+- [`64e1d09`](https://github.com/rik9564/browsecraft/commit/64e1d0960e6a3eac6e40c99e39889da0bd8095f8) Thanks [@rik9564](https://github.com/rik9564)! - Drop the `ws` dependency in favor of Node's built-in, spec-compliant `WebSocket` global (stable since Node 22). This removes the last non-essential external runtime dependency from the BiDi transport layer. Requires Node.js >= 22.
+
+- Updated dependencies [[`fcde5dc`](https://github.com/rik9564/browsecraft/commit/fcde5dc88dd6336982d1f2becd3b42a0635e505c), [`64e1d09`](https://github.com/rik9564/browsecraft/commit/64e1d0960e6a3eac6e40c99e39889da0bd8095f8), [`bca605a`](https://github.com/rik9564/browsecraft/commit/bca605a0058c5ce98ede75c28de2a25788073878)]:
+  - browsecraft-ai@0.7.0
+
 ## 0.6.3
 
 ### Patch Changes
