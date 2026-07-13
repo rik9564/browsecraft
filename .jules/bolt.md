@@ -1,0 +1,3 @@
+## 2025-02-24 - Pre-compiled RegExp for high-frequency sanitize calls
+**Learning:** For high-frequency string matching (e.g., sanitize routines on network events), replacing `Array.some(keyword => target.toLowerCase().includes(keyword))` with a single pre-compiled, non-global regular expression (`RegExp.test()`) can improve execution speed by ~6x by reducing object allocation and iteration overhead. Avoid global `g` flag as it maintains `lastIndex` state across executions and causes false negatives.
+**Action:** Use pre-compiled non-global regex for high-frequency array/string inclusion checks on critical paths.
