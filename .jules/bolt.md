@@ -1,0 +1,3 @@
+## 2024-07-18 - High-frequency string matching optimization
+**Learning:** For high-frequency string matching on network events, replacing `Array.some(keyword => target.toLowerCase().includes(keyword))` with a single pre-compiled, non-global regular expression (`RegExp.test()`) can improve execution speed significantly by reducing object allocation and iteration overhead.
+**Action:** When seeing `.some()` loops used for substring matches against a static list of keywords in hot paths like sanitization, convert them to a pre-compiled `RegExp` using non-capturing groups `(?:a|b|c)`. Avoid the global `g` flag as it maintains state across executions.
