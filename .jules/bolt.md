@@ -1,0 +1,3 @@
+## 2023-10-26 - Optimize string matching in sanitize
+**Learning:** For high-frequency string matching (e.g., sanitize routines on network events), replacing `Array.some(keyword => target.toLowerCase().includes(keyword))` with a single pre-compiled, non-global regular expression (`RegExp.test()`) can improve execution speed by ~6x by reducing object allocation and iteration overhead. When doing this, avoid using the global `g` flag, as it maintains `lastIndex` state across executions and causes false negatives on subsequent checks.
+**Action:** Use pre-compiled non-global RegEx for frequent string matching in core utility functions instead of array iteration.
