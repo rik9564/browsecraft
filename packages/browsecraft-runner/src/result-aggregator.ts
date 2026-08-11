@@ -143,8 +143,13 @@ export class ResultAggregator {
 
 		// Totals
 		const uniqueScenarios = new Set(allResults.map((r) => r.item.id));
-		const flaky = matrix.filter((r) => r.flaky);
-		const inconsistent = matrix.filter((r) => r.crossBrowserInconsistent);
+
+		const flaky: ScenarioMatrixRow[] = [];
+		const inconsistent: ScenarioMatrixRow[] = [];
+		for (const r of matrix) {
+			if (r.flaky) flaky.push(r);
+			if (r.crossBrowserInconsistent) inconsistent.push(r);
+		}
 
 		const totals = {
 			scenarios: uniqueScenarios.size,
@@ -156,7 +161,12 @@ export class ResultAggregator {
 		};
 
 		// Timing
-		const allDurations = allResults.filter((r) => r.status !== 'skipped').map((r) => r.duration);
+		const allDurations: number[] = [];
+		for (const r of allResults) {
+			if (r.status !== 'skipped') {
+				allDurations.push(r.duration);
+			}
+		}
 		const timing = this.computeTimingStats(allDurations);
 
 		// Notable tests
