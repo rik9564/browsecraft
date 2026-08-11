@@ -191,10 +191,7 @@ export class Scheduler {
 			const browserResults = results.filter((r) => r.worker.browser === browser);
 			this.bus.emit('browser:end', {
 				browser,
-				passed: browserResults.filter((r) => r.status === 'passed').length,
-				failed: browserResults.filter((r) => r.status === 'failed').length,
-				skipped: browserResults.filter((r) => r.status === 'skipped').length,
-				duration: browserResults.reduce((sum, r) => sum + r.duration, 0),
+				...this.calculateStats(browserResults),
 			});
 		}
 
@@ -225,11 +222,10 @@ export class Scheduler {
 			const results = await this.pool.executeOnBrowser(browser, items, executor);
 			allResults.push(...results);
 
+			const stats = this.calculateStats(results);
 			this.bus.emit('browser:end', {
 				browser,
-				passed: results.filter((r) => r.status === 'passed').length,
-				failed: results.filter((r) => r.status === 'failed').length,
-				skipped: results.filter((r) => r.status === 'skipped').length,
+				...stats,
 				duration: Date.now() - browserStart,
 			});
 		}
@@ -272,11 +268,10 @@ export class Scheduler {
 
 			const results = await this.pool.executeOnBrowser(browser, browserItems, executor);
 
+			const stats = this.calculateStats(results);
 			this.bus.emit('browser:end', {
 				browser,
-				passed: results.filter((r) => r.status === 'passed').length,
-				failed: results.filter((r) => r.status === 'failed').length,
-				skipped: results.filter((r) => r.status === 'skipped').length,
+				...stats,
 				duration: Date.now() - browserStart,
 			});
 
@@ -285,6 +280,29 @@ export class Scheduler {
 
 		const browserResultSets = await Promise.all(browserPromises);
 		return browserResultSets.flat();
+	}
+
+	// -----------------------------------------------------------------------
+	// Stats helper
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Calculate stats for a set of results in a single pass O(N).
+	 * Replaces multiple `.filter().length` and `.reduce()` calls to improve performance.
+	 */
+	private calculateStats(results: WorkItemResult[]) {
+		let passed = 0;
+		let failed = 0;
+		let skipped = 0;
+		let duration = 0;
+		for (let i = 0; i < results.length; i++) {
+			const r = results[i]!;
+			if (r.status === 'passed') passed++;
+			else if (r.status === 'failed') failed++;
+			else if (r.status === 'skipped') skipped++;
+			duration += r.duration;
+		}
+		return { passed, failed, skipped, duration };
 	}
 
 	// -----------------------------------------------------------------------
@@ -358,19 +376,18 @@ export class Scheduler {
 			return {
 				browser,
 				results,
-				passed: results.filter((r) => r.status === 'passed').length,
-				failed: results.filter((r) => r.status === 'failed').length,
-				skipped: results.filter((r) => r.status === 'skipped').length,
-				duration: results.reduce((sum, r) => sum + r.duration, 0),
+				...this.calculateStats(results),
 			};
 		});
+
+		const totalStats = this.calculateStats(allResults);
 
 		return {
 			browsers: browserResults,
 			allResults,
-			totalPassed: allResults.filter((r) => r.status === 'passed').length,
-			totalFailed: allResults.filter((r) => r.status === 'failed').length,
-			totalSkipped: allResults.filter((r) => r.status === 'skipped').length,
+			totalPassed: totalStats.passed,
+			totalFailed: totalStats.failed,
+			totalSkipped: totalStats.skipped,
 			totalDuration,
 			strategy: this.config.strategy,
 		};
