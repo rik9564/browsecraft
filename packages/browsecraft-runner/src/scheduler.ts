@@ -188,13 +188,26 @@ export class Scheduler {
 
 		// Emit browser end events
 		for (const browser of browsers) {
-			const browserResults = results.filter((r) => r.worker.browser === browser);
+			// Optimization: Calculate stats in a single pass to avoid N+1 traversals
+			// and intermediate allocations from repeated .filter() and .reduce() calls
+			let passed = 0;
+			let failed = 0;
+			let skipped = 0;
+			let duration = 0;
+			for (const r of results) {
+				if (r.worker.browser === browser) {
+					if (r.status === 'passed') passed++;
+					else if (r.status === 'failed') failed++;
+					else if (r.status === 'skipped') skipped++;
+					duration += r.duration;
+				}
+			}
 			this.bus.emit('browser:end', {
 				browser,
-				passed: browserResults.filter((r) => r.status === 'passed').length,
-				failed: browserResults.filter((r) => r.status === 'failed').length,
-				skipped: browserResults.filter((r) => r.status === 'skipped').length,
-				duration: browserResults.reduce((sum, r) => sum + r.duration, 0),
+				passed,
+				failed,
+				skipped,
+				duration,
 			});
 		}
 
@@ -225,11 +238,21 @@ export class Scheduler {
 			const results = await this.pool.executeOnBrowser(browser, items, executor);
 			allResults.push(...results);
 
+			// Optimization: Calculate stats in a single pass to avoid N+1 traversals
+			// and intermediate allocations from repeated .filter() calls
+			let passed = 0;
+			let failed = 0;
+			let skipped = 0;
+			for (const r of results) {
+				if (r.status === 'passed') passed++;
+				else if (r.status === 'failed') failed++;
+				else if (r.status === 'skipped') skipped++;
+			}
 			this.bus.emit('browser:end', {
 				browser,
-				passed: results.filter((r) => r.status === 'passed').length,
-				failed: results.filter((r) => r.status === 'failed').length,
-				skipped: results.filter((r) => r.status === 'skipped').length,
+				passed,
+				failed,
+				skipped,
 				duration: Date.now() - browserStart,
 			});
 		}
@@ -272,11 +295,22 @@ export class Scheduler {
 
 			const results = await this.pool.executeOnBrowser(browser, browserItems, executor);
 
+			// Optimization: Calculate stats in a single pass to avoid N+1 traversals
+			// and intermediate allocations from repeated .filter() calls
+			let passed = 0;
+			let failed = 0;
+			let skipped = 0;
+			for (const r of results) {
+				if (r.status === 'passed') passed++;
+				else if (r.status === 'failed') failed++;
+				else if (r.status === 'skipped') skipped++;
+			}
+
 			this.bus.emit('browser:end', {
 				browser,
-				passed: results.filter((r) => r.status === 'passed').length,
-				failed: results.filter((r) => r.status === 'failed').length,
-				skipped: results.filter((r) => r.status === 'skipped').length,
+				passed,
+				failed,
+				skipped,
 				duration: Date.now() - browserStart,
 			});
 
@@ -353,24 +387,60 @@ export class Scheduler {
 		browsers: BrowserName[],
 		totalDuration: number,
 	): SchedulerResult {
+		// Optimization: Use a single O(N) loop and a hash map (O(1) lookups) to aggregate
+		// overall totals and per-browser results simultaneously. This avoids redundant
+		// array traversals and intermediate allocations caused by repeated .filter() and .reduce() calls.
+		let totalPassed = 0;
+		let totalFailed = 0;
+		let totalSkipped = 0;
+		const browserStats = new Map<
+			BrowserName,
+			{
+				passed: number;
+				failed: number;
+				skipped: number;
+				duration: number;
+				results: WorkItemResult[];
+			}
+		>();
+
+		for (const browser of browsers) {
+			browserStats.set(browser, { passed: 0, failed: 0, skipped: 0, duration: 0, results: [] });
+		}
+
+		for (const r of allResults) {
+			if (r.status === 'passed') totalPassed++;
+			else if (r.status === 'failed') totalFailed++;
+			else if (r.status === 'skipped') totalSkipped++;
+
+			const stats = browserStats.get(r.worker.browser);
+			if (stats) {
+				stats.results.push(r);
+				if (r.status === 'passed') stats.passed++;
+				else if (r.status === 'failed') stats.failed++;
+				else if (r.status === 'skipped') stats.skipped++;
+				stats.duration += r.duration;
+			}
+		}
+
 		const browserResults: BrowserResult[] = browsers.map((browser) => {
-			const results = allResults.filter((r) => r.worker.browser === browser);
+			const stats = browserStats.get(browser)!;
 			return {
 				browser,
-				results,
-				passed: results.filter((r) => r.status === 'passed').length,
-				failed: results.filter((r) => r.status === 'failed').length,
-				skipped: results.filter((r) => r.status === 'skipped').length,
-				duration: results.reduce((sum, r) => sum + r.duration, 0),
+				results: stats.results,
+				passed: stats.passed,
+				failed: stats.failed,
+				skipped: stats.skipped,
+				duration: stats.duration,
 			};
 		});
 
 		return {
 			browsers: browserResults,
 			allResults,
-			totalPassed: allResults.filter((r) => r.status === 'passed').length,
-			totalFailed: allResults.filter((r) => r.status === 'failed').length,
-			totalSkipped: allResults.filter((r) => r.status === 'skipped').length,
+			totalPassed,
+			totalFailed,
+			totalSkipped,
 			totalDuration,
 			strategy: this.config.strategy,
 		};
