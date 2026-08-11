@@ -1,0 +1,3 @@
+## 2026-04-15 - Async Disk I/O to prevent blocking Event Loop in bdd
+**Learning:** Disk I/O operations (e.g., `saveDiskCache`) in `browsecraft-bdd` must use `node:fs/promises` instead of synchronous equivalents to prevent blocking the event loop, which is critical for maintaining responsiveness to WebDriver BiDi messages.
+**Action:** Always prefer `node:fs/promises` (`readFile`, `writeFile`, `mkdir`) over sync alternatives like `readFileSync` or `writeFileSync` when performing file operations in areas that manage concurrent socket or bidi connections.
