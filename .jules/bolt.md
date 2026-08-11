@@ -1,0 +1,3 @@
+## 2024-04-09 - Pre-compile Regex over Array.some() for sanitize function
+**Learning:** For high-frequency string matching like recursively checking keys during BiDi message sanitization, iterating over an array using `Array.some(str.includes)` with case conversions allocates redundant strings and traverses arrays repeatedly on every recursive step. `RegExp.test` using a pre-compiled regex avoids these object allocations, eliminates repetitive array traversals, and is significantly faster in Node.js.
+**Action:** Use pre-compiled RegExes instead of array iterations and `.toLowerCase()` + `.includes()` when inspecting recursive keys in high-frequency data structures or network message interceptors.
