@@ -484,11 +484,13 @@ export class AIStepExecutor {
 		if (!this.cachePath) return;
 
 		try {
-			const { mkdirSync, writeFileSync } = await import('node:fs');
+			const { mkdir, writeFile } = await import('node:fs/promises');
 			const { dirname } = await import('node:path');
 
 			// Ensure directory exists
-			mkdirSync(dirname(this.cachePath), { recursive: true });
+			// ⚡ Bolt Optimization: Use async fs methods to prevent blocking the Node.js event loop.
+			// Synchronous I/O here can cause unresponsiveness to incoming WebDriver BiDi messages.
+			await mkdir(dirname(this.cachePath), { recursive: true });
 
 			// Serialize the cache — only plans that meet confidence threshold
 			const entries: Array<{ key: string; plan: ActionPlan }> = [];
@@ -499,7 +501,7 @@ export class AIStepExecutor {
 				}
 			}
 
-			writeFileSync(this.cachePath, JSON.stringify(entries, null, 2), 'utf-8');
+			await writeFile(this.cachePath, JSON.stringify(entries, null, 2), 'utf-8');
 
 			if (this.debugMode) {
 				console.log(`  [AI] Saved ${entries.length} plans to ${this.cachePath}`);
