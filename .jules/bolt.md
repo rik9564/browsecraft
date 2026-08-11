@@ -1,0 +1,3 @@
+## $(date +%Y-%m-%d) - Pre-compiled Regex for High-Frequency String Matching
+**Learning:** For high-frequency string matching (like in BiDi message serialization), replacing \`Array.some(keyword => target.includes(keyword))\` with a single pre-compiled, non-global regular expression (\`RegExp.test()\`) significantly improves execution speed by reducing object allocation and array iteration overhead. Avoid the global \`g\` flag to prevent \`lastIndex\` state pollution.
+**Action:** Always prefer pre-compiled, non-global regular expressions for repeated substring matching against a known set of keywords.
