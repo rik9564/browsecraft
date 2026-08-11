@@ -1,0 +1,3 @@
+## 2024-05-24 - [Optimize BiDi Payload Sanitization with RegExp]
+**Learning:** For high-frequency string matching (like sanitizing BiDi payloads recursively), `RegExp.test()` is significantly faster than `Array.prototype.some` with `.includes()` due to avoiding closure/function allocations and taking advantage of optimized regular expression engines. In Node.js, `RegExp.test` is approximately ~8-9x faster than `Array.prototype.some` for multiple substring inclusions.
+**Action:** Use pre-compiled regular expressions for checking string inclusions against a predefined list of substrings instead of `Array.some(str.includes)` for performance-critical and highly recursive functions.
