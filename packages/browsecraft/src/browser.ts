@@ -270,9 +270,7 @@ export class Browser {
 
 	/** Close the browser and clean up all resources. */
 	async close(): Promise<void> {
-		for (const page of this.pages) {
-			await page.close().catch(() => {});
-		}
+		await Promise.all(this.pages.map((page) => page.close().catch(() => {})));
 		this.pages = [];
 		await this.session.close();
 	}
@@ -303,13 +301,17 @@ export class Browser {
 		try {
 			const tree = await this.session.browsingContext.getTree();
 			const contexts = tree.contexts ?? [];
+			const closingPromises: Promise<void>[] = [];
 			for (const ctx of contexts) {
 				const alreadyTracked = this.pages.some((p) => p.contextId === ctx.context);
 				const isDefaultContext = !ctx.userContext || ctx.userContext === 'default';
 				if (!alreadyTracked && ctx.url === 'about:blank' && isDefaultContext) {
-					await this.session.browsingContext.close({ context: ctx.context }).catch(() => {});
+					closingPromises.push(
+						this.session.browsingContext.close({ context: ctx.context }).catch(() => {}),
+					);
 				}
 			}
+			await Promise.all(closingPromises);
 		} catch {
 			// getTree or close not supported — ignore
 		}
@@ -396,9 +398,7 @@ export class BrowserContext {
 
 	/** Close this context and all its pages. */
 	async close(): Promise<void> {
-		for (const page of this.pages) {
-			await page.close().catch(() => {});
-		}
+		await Promise.all(this.pages.map((page) => page.close().catch(() => {})));
 		this.pages = [];
 
 		if (this.userContext) {
