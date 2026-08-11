@@ -325,6 +325,20 @@ function waitForWSEndpoint(
 			);
 		}, timeout);
 
+		const ensureFirefoxBidiPath = (endpoint: string): string => {
+			if (browser !== 'firefox') return endpoint;
+
+			try {
+				const parsed = new URL(endpoint);
+				if (!parsed.pathname || parsed.pathname === '/') {
+					parsed.pathname = '/session';
+				}
+				return parsed.toString();
+			} catch {
+				return endpoint;
+			}
+		};
+
 		const onData = (data: Buffer) => {
 			const chunk = data.toString('utf-8');
 			stderr += chunk;
@@ -343,7 +357,7 @@ function waitForWSEndpoint(
 			if (firefoxMatch?.[1]) {
 				clearTimeout(timer);
 				proc.stderr?.off('data', onData);
-				resolve(firefoxMatch[1]);
+				resolve(ensureFirefoxBidiPath(firefoxMatch[1]));
 				return;
 			}
 		};
