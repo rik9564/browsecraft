@@ -13,6 +13,7 @@ const SENSITIVE_KEYS = [
 	'session',
 	'auth',
 ];
+const SENSITIVE_REGEX = new RegExp(SENSITIVE_KEYS.join('|'), 'i');
 const REDACTED_VALUE = '[REDACTED]';
 
 /**
@@ -24,51 +25,55 @@ export function sanitize(obj: unknown): unknown {
 	}
 
 	if (Array.isArray(obj)) {
-		return obj.map(sanitize);
+		let changed = false;
+		const newArray = obj.map((item) => {
+			const sanitized = sanitize(item);
+			if (sanitized !== item) changed = true;
+			return sanitized;
+		});
+		return changed ? newArray : obj;
 	}
 
-	const result: Record<string, unknown> = {};
 	const record = obj as Record<string, unknown>;
+	let result: Record<string, unknown> | undefined;
 
-	for (const [key, value] of Object.entries(record)) {
-		const lowerKey = key.toLowerCase();
+	for (const key of Object.keys(record)) {
+		const value = record[key];
+		let newValue = value;
 
-		// 1. If it's an array, always recurse into it
-		// This prevents redacting entire arrays like 'cookies' or 'headers'
+		// 1. If it's an array, recurse into it (skipping key check for the array itself)
 		if (Array.isArray(value)) {
-			result[key] = value.map(sanitize);
-			continue;
-		}
-
-		// 2. Direct key match (e.g., { password: "..." })
-		if (SENSITIVE_KEYS.some((k) => lowerKey.includes(k))) {
-			result[key] = REDACTED_VALUE;
-			continue;
-		}
-
-		// 3. Header/Cookie match: { name: "Authorization", value: "..." }
-		// If we're looking at the 'value' key, check its sibling 'name'
-		if (
-			lowerKey === 'value' &&
-			typeof record.name === 'string' &&
-			SENSITIVE_KEYS.some((k) => (record.name as string).toLowerCase().includes(k))
-		) {
-			if (typeof value === 'object' && value !== null && 'value' in (value as object)) {
-				// Handle BiDi RemoteValue-like structures: { type: "string", value: "..." }
-				result[key] = { ...(value as object), value: REDACTED_VALUE };
-			} else {
-				result[key] = REDACTED_VALUE;
-			}
-			continue;
-		}
-
-		// 4. Recurse for other objects
-		if (typeof value === 'object' && value !== null) {
-			result[key] = sanitize(value);
+			newValue = sanitize(value);
 		} else {
-			result[key] = value;
+			// 2. Direct key match
+			if (SENSITIVE_REGEX.test(key)) {
+				newValue = REDACTED_VALUE;
+			}
+			// 3. Header/Cookie match: { name: "Authorization", value: "..." }
+			else if (
+				key.length === 5 &&
+				key.toLowerCase() === 'value' &&
+				typeof record.name === 'string' &&
+				SENSITIVE_REGEX.test(record.name)
+			) {
+				if (typeof value === 'object' && value !== null && 'value' in (value as object)) {
+					// Handle BiDi RemoteValue-like structures: { type: "string", value: "..." }
+					newValue = { ...(value as object), value: REDACTED_VALUE };
+				} else {
+					newValue = REDACTED_VALUE;
+				}
+			}
+			// 4. Recurse for other objects
+			else if (typeof value === 'object' && value !== null) {
+				newValue = sanitize(value);
+			}
+		}
+
+		if (newValue !== value) {
+			if (!result) result = { ...record };
+			result[key] = newValue;
 		}
 	}
 
-	return result;
+	return result || obj;
 }
