@@ -1,0 +1,3 @@
+## 2024-03-20 - [Performance] Use RegExp for fast-firing socket payload string matching
+**Learning:** For high-frequency string matching (e.g., sanitization of fast-firing socket payloads), `RegExp.test` with a pre-compiled regex is preferred over `Array.some(str.includes)` as it avoids object allocation, redundant traversal, and is significantly faster in Node.js.
+**Action:** Replace `Array.some` checks with a pre-compiled Regex where string matching happens frequently, like inside recursive loops or hot paths handling network payloads.
