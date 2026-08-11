@@ -239,11 +239,20 @@ export class TestRunner {
 	}
 
 	private summarize(results: TestResult[], totalDuration: number): RunSummary {
+		// Bolt Optimization: Replace multiple .filter().length calls with single O(N) iteration
+		let passed = 0;
+		let failed = 0;
+		let skipped = 0;
+		for (const r of results) {
+			if (r.status === 'passed') passed++;
+			else if (r.status === 'failed') failed++;
+			else if (r.status === 'skipped') skipped++;
+		}
 		return {
 			total: results.length,
-			passed: results.filter((r) => r.status === 'passed').length,
-			failed: results.filter((r) => r.status === 'failed').length,
-			skipped: results.filter((r) => r.status === 'skipped').length,
+			passed,
+			failed,
+			skipped,
 			duration: totalDuration,
 			results,
 		};
