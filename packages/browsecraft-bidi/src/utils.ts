@@ -3,20 +3,14 @@
  * Handles both direct key matches and nested header/cookie structures.
  */
 
-const SENSITIVE_KEYS = [
-	'authorization',
-	'cookie',
-	'set-cookie',
-	'password',
-	'token',
-	'secret',
-	'session',
-	'auth',
-];
+// Optimization: Combined regex for faster matching.
+// 'auth' matches 'authorization', 'cookie' matches 'set-cookie', etc.
+const SENSITIVE_REGEX = /(?:cookie|password|token|secret|session|auth)/i;
 const REDACTED_VALUE = '[REDACTED]';
 
 /**
  * Recursively redacts sensitive fields from an object.
+ * Uses a copy-on-write strategy to avoid unnecessary allocations.
  */
 export function sanitize(obj: unknown): unknown {
 	if (obj === null || typeof obj !== 'object') {
@@ -24,51 +18,70 @@ export function sanitize(obj: unknown): unknown {
 	}
 
 	if (Array.isArray(obj)) {
-		return obj.map(sanitize);
+		let copy: unknown[] | null = null;
+		for (let i = 0; i < obj.length; i++) {
+			const val = obj[i];
+			const sanitized = sanitize(val);
+			if (sanitized !== val) {
+				if (!copy) {
+					copy = obj.slice(0, i);
+				}
+				copy.push(sanitized);
+			} else if (copy) {
+				copy.push(val);
+			}
+		}
+		return copy || obj;
 	}
 
-	const result: Record<string, unknown> = {};
 	const record = obj as Record<string, unknown>;
+	let copy: Record<string, unknown> | null = null;
 
-	for (const [key, value] of Object.entries(record)) {
-		const lowerKey = key.toLowerCase();
+	// Optimization: Pre-check if this object has a sensitive name property
+	// This avoids checking 'value' + sibling 'name' in the loop for every key
+	const name = record.name;
+	const isSensitiveName = typeof name === 'string' && SENSITIVE_REGEX.test(name);
 
-		// 1. If it's an array, always recurse into it
+	for (const key in record) {
+		// Ensure we only iterate own properties
+		if (!Object.prototype.hasOwnProperty.call(record, key)) {
+			continue;
+		}
+
+		const value = record[key];
+		let newValue = value;
+
+		// 1. If it's an array, let recursive sanitize handle it
 		// This prevents redacting entire arrays like 'cookies' or 'headers'
 		if (Array.isArray(value)) {
-			result[key] = value.map(sanitize);
-			continue;
+			newValue = sanitize(value);
 		}
-
-		// 2. Direct key match (e.g., { password: "..." })
-		if (SENSITIVE_KEYS.some((k) => lowerKey.includes(k))) {
-			result[key] = REDACTED_VALUE;
-			continue;
+		// 2. Check if key is sensitive
+		else if (SENSITIVE_REGEX.test(key)) {
+			newValue = REDACTED_VALUE;
 		}
-
-		// 3. Header/Cookie match: { name: "Authorization", value: "..." }
-		// If we're looking at the 'value' key, check its sibling 'name'
-		if (
-			lowerKey === 'value' &&
-			typeof record.name === 'string' &&
-			SENSITIVE_KEYS.some((k) => (record.name as string).toLowerCase().includes(k))
-		) {
+		// 3. Check if it's a value for a sensitive name (e.g. { name: "Authorization", value: "..." })
+		else if (isSensitiveName && key === 'value') {
 			if (typeof value === 'object' && value !== null && 'value' in (value as object)) {
 				// Handle BiDi RemoteValue-like structures: { type: "string", value: "..." }
-				result[key] = { ...(value as object), value: REDACTED_VALUE };
+				newValue = { ...(value as object), value: REDACTED_VALUE };
 			} else {
-				result[key] = REDACTED_VALUE;
+				newValue = REDACTED_VALUE;
 			}
-			continue;
+		}
+		// 4. Recurse for other objects
+		else {
+			newValue = sanitize(value);
 		}
 
-		// 4. Recurse for other objects
-		if (typeof value === 'object' && value !== null) {
-			result[key] = sanitize(value);
-		} else {
-			result[key] = value;
+		// Copy-on-write: only create a new object if something changed
+		if (newValue !== value) {
+			if (!copy) {
+				copy = { ...record };
+			}
+			copy[key] = newValue;
 		}
 	}
 
-	return result;
+	return copy || obj;
 }
