@@ -1,0 +1,3 @@
+## 2025-05-18 - Optimize fast-firing string matching with pre-compiled RegExp
+**Learning:** Found string sanitization of high-frequency BiDi socket payloads using `Array.some((k) => string.includes(k))`. This causes unnecessary array traversal and object allocation, becoming a measurable bottleneck when processing large volumes of messages.
+**Action:** Replace `Array.some(includes)` with a pre-compiled `RegExp.test` for O(1) matching against multiple alternatives.
