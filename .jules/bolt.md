@@ -1,0 +1,3 @@
+## 2025-04-02 - Avoid N+1 array iterations in test results processing
+**Learning:** In the test runner's reporting and result aggregation (`scheduler.ts` and `runner.ts`), multiple array passes (`.filter().length` and `.reduce()`) were being used over test result arrays to compute statuses (passed, failed, skipped) and sum durations. These redundant array traversals and intermediate array allocations create unnecessary overhead, especially for large test suites running in matrix configurations.
+**Action:** Replaced multiple `.filter()` and `.reduce()` calls with a single O(N) `for` loop that computes all necessary metrics (counts and duration) concurrently, eliminating redundant intermediate array allocations.
