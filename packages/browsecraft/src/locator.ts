@@ -398,13 +398,15 @@ async function resolveLabelsToInputs(
 	contextId: string,
 	nodes: NodeRemoteValue[],
 ): Promise<NodeRemoteValue | null> {
-	for (const node of nodes) {
-		if (!node.sharedId) continue;
+	// Batch check: pass all nodes at once to minimize round-trips
+	const nodeArgs = nodes.filter((n) => n.sharedId);
+	if (nodeArgs.length === 0) return null;
 
-		try {
-			// Check if this node is a <label> and if so, resolve its associated input
-			const result = await session.script.callFunction({
-				functionDeclaration: `function(el) {
+	try {
+		const result = await session.script.callFunction({
+			functionDeclaration: `function(...elements) {
+				for (const el of elements) {
+					if (!el) continue;
 					// If the element is a <label> with a 'for' attribute, find the associated input
 					if (el.tagName === 'LABEL') {
 						const forId = el.getAttribute('for');
@@ -416,23 +418,23 @@ async function resolveLabelsToInputs(
 						const nested = el.querySelector('input, textarea, select');
 						if (nested) return nested;
 					}
-					return null;
-				}`,
-				target: { context: contextId },
-				arguments: [{ sharedId: node.sharedId, handle: node.handle }],
-				awaitPromise: false,
-				resultOwnership: 'root',
-			});
+				}
+				return null;
+			}`,
+			target: { context: contextId },
+			arguments: nodeArgs.map((n) => ({ sharedId: n.sharedId!, handle: n.handle })),
+			awaitPromise: false,
+			resultOwnership: 'root',
+		});
 
-			if (
-				result.type === 'success' &&
-				result.result?.type === 'node' &&
-				(result.result as NodeRemoteValue).sharedId
-			) {
-				return result.result as NodeRemoteValue;
-			}
-		} catch {}
-	}
+		if (
+			result.type === 'success' &&
+			result.result?.type === 'node' &&
+			(result.result as NodeRemoteValue).sharedId
+		) {
+			return result.result as NodeRemoteValue;
+		}
+	} catch {}
 
 	return null;
 }
