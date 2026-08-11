@@ -478,7 +478,7 @@ async function testDataTestId() {
 		const page = await browser.newPage();
 
 		// Navigate to a page and inject elements with data-testid
-		await page.goto('https://example.com');
+		await page.goto('https://example.com', { wait: 'none' });
 		await page.evaluate(`
 			const div = document.createElement('div');
 			div.setAttribute('data-testid', 'my-widget');
@@ -613,7 +613,7 @@ async function testBddIntegration() {
 
 		assert(doc.feature?.name === 'Sauce Demo Login', 'feature file parsed correctly');
 
-		browser = await Browser.launch({ headless: false });
+		browser = await Browser.launch({ headless: true });
 
 		const executor = new BddExecutor({
 			stepTimeout: 30000,
