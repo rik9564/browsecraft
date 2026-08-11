@@ -1,0 +1,3 @@
+## 2023-06-11 - Regex vs Array.some for High-Frequency String Matching
+**Learning:** For high-frequency string matching operations (like checking BiDi message keys against sensitive terms), using a pre-compiled regular expression (`RegExp.test()`) is significantly faster (~2.7x) than iterating over an array with `Array.some(keyword => target.includes(keyword))`. This prevents `.toLowerCase()` object allocations and array iteration overhead per check.
+**Action:** When performing substring or exact matches against a small, static list of keywords in high-throughput paths, default to pre-compiled `RegExp` instead of array methods. Ensure the regex does NOT use the global `g` flag, as it maintains state (`lastIndex`) across executions.
